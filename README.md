@@ -1,5 +1,7 @@
 # Vidbase
 
+> 🤖 **AI-Generated Project:** This application was developed *entirely* by Artificial Intelligence. The only human interaction involved was writing the prompts to guide the development process.
+
 A modern, fast, and lightweight native video player built with [Tauri](https://v2.tauri.app/), [React](https://reactjs.org/), and [TypeScript](https://www.typescriptlang.org/). 
 
 ## Features
