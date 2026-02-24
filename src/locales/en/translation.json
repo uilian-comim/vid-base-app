@@ -1,0 +1,172 @@
+{
+    "sidebar": {
+        "home": "Home",
+        "continue_watching": "Continue Watching",
+        "all_files": "All Files",
+        "file_types": "File Types",
+        "videos": "Videos",
+        "documents": "Documents",
+        "directories": "Directories",
+        "settings": "Settings",
+        "files": "files",
+        "folders": "folders"
+    },
+    "home": {
+        "continue_watching": "Continue Watching",
+        "watch_again": "Watch Again",
+        "recent": "Recent",
+        "loading": "Loading...",
+        "no_recent_files": "No recent files",
+        "play": "Play",
+        "directories": "Directories",
+        "add": "Add",
+        "library": "Library",
+        "videos": "Videos",
+        "documents": "Documents",
+        "remaining": "remaining"
+    },
+    "settings": {
+        "title": "Settings",
+        "appearance": "Appearance",
+        "theme": "Theme",
+        "light": "Light",
+        "dark": "Dark",
+        "language": "Language",
+        "display": "Display",
+        "resolution": "Window Resolution",
+        "directories": "Directories",
+        "manage_dirs": "Manage Directories",
+        "add_dir": "Add Directory",
+        "no_dirs": "No directories added",
+        "clear_all": "Clear All",
+        "video": "Video",
+        "skip_backward": "Skip Backward (seconds)",
+        "skip_forward": "Skip Forward (seconds)",
+        "advanced": "Advanced",
+        "reset": "Reset Settings",
+        "reset_desc": "Restore all settings to default values",
+        "close": "Close",
+        "confirm_reset": "Are you sure you want to reset all settings?",
+        "confirm_clear_dirs": "Are you sure you want to remove all directories?",
+        "confirm_remove_dir": "Are you sure you want to remove this directory?",
+        "remove_dir": "Remove Directory",
+        "portuguese": "Portuguese (Brasil)",
+        "english": "English",
+        "spanish": "Spanish"
+    },
+    "file_types": {
+        "video": "Video",
+        "document": "Document"
+    },
+    "breadcrumbs": {
+        "home": "Home"
+    },
+    "video": {
+        "close": "Close Video",
+        "watched": "Watched",
+        "mark_as_watched": "Mark as watched",
+        "episodes": "Episodes",
+        "course_episodes": "Course Episodes",
+        "lessons": "lessons",
+        "loading": "Loading...",
+        "playing_now": "Playing now",
+        "lesson": "Lesson",
+        "speed": "Speed",
+        "quality": "Quality",
+        "auto": "Auto",
+        "playback_speed": "Playback Speed",
+        "normal": "Normal"
+    },
+    "common": {
+        "items_one": "{{count}} item",
+        "items_other": "{{count}} items",
+        "files": "files",
+        "folders": "folders",
+        "confirm": "Confirm",
+        "cancel": "Cancel"
+    },
+    "time": {
+        "just_now": "Just now",
+        "minutes_ago_one": "{{count}} minute ago",
+        "minutes_ago_other": "{{count}} minutes ago",
+        "hours_ago_one": "{{count}} hour ago",
+        "hours_ago_other": "{{count}} hours ago",
+        "yesterday": "Yesterday",
+        "days_ago": "{{count}} days ago",
+        "seconds_short": "s"
+    },
+    "all_files": {
+        "title": "All Files",
+        "videos": "Videos",
+        "documents": "Documents",
+        "folders_found_one": "{{count}} folder found",
+        "folders_found_other": "{{count}} folders found",
+        "show_all": "Show all folders",
+        "group_by_root": "Group by Root",
+        "group_by_origin": "Group by Origin",
+        "grid_view": "Grid View",
+        "list_view": "List View",
+        "sort_by": "Sort by:",
+        "sort_name": "Name",
+        "sort_count": "File Count",
+        "sort_asc": "Ascending",
+        "sort_desc": "Descending",
+        "search_placeholder": "Search folders...",
+        "add": "Add",
+        "add_directory": "Add Directory",
+        "add_directories": "Add Directories",
+        "no_folders_found": "No folders found",
+        "no_dirs_with_files": "No directories with files found",
+        "add_to_start": "Add directories to start"
+    },
+    "file_browser": {
+        "local_dirs": "Local Directories",
+        "manage_media": "Manage your media directories",
+        "search_this_folder": "Search this folder...",
+        "search_dirs": "Search directories...",
+        "loading": "Loading directory...",
+        "no_results": "No results found",
+        "empty_folder": "Empty folder",
+        "no_dirs_added": "No directories added",
+        "click_to_start": "Click \"Add Directory\" to start"
+    },
+    "document_viewer": {
+        "title": "Document Viewer",
+        "close": "Close Document",
+        "other_files": "Other Files",
+        "files_in_folder": "Files in Folder",
+        "documents": "documents",
+        "loading": "Loading..."
+    },
+    "search_bar": {
+        "placeholder_default": "Search files and folders..."
+    },
+    "continue_watching": {
+        "title": "Continue Watching",
+        "subtitle": "Resume where you left off",
+        "video_completed": "Video completed! Continue with the next one or watch again.",
+        "continue_prompt": "Continue from where you left off.",
+        "remaining": "Remaining",
+        "last_watched": "Last watched:",
+        "watch_again": "Watch Again",
+        "continue": "Continue Watching",
+        "history_title": "Watch History",
+        "no_videos": "No videos in progress",
+        "start_watching": "Start watching something to see it here"
+    },
+    "file_card": {
+        "video": "Video",
+        "document": "Document"
+    },
+    "directories_view": {
+        "title": "Local Directories",
+        "subtitle": "Manage your media directories",
+        "files": "files",
+        "add_directory": "Add Directory",
+        "no_directories": "No directories added",
+        "click_to_start": "Click \"Add Directory\" to start"
+    },
+    "thumbnail": {
+        "alt": "Thumbnail"
+    }
+}

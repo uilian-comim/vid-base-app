@@ -1,0 +1,172 @@
+{
+    "sidebar": {
+        "home": "Início",
+        "continue_watching": "Continuar Assistindo",
+        "all_files": "Todos os Arquivos",
+        "file_types": "Tipos de Arquivo",
+        "videos": "Vídeos",
+        "documents": "Documentos",
+        "directories": "Diretórios",
+        "settings": "Configurações",
+        "files": "arquivos",
+        "folders": "pastas"
+    },
+    "home": {
+        "continue_watching": "Continuar Assistindo",
+        "watch_again": "Assistir Novamente",
+        "recent": "Recentes",
+        "loading": "Carregando...",
+        "no_recent_files": "Nenhum arquivo recente",
+        "play": "Reproduzir",
+        "directories": "Diretórios",
+        "add": "Adicionar",
+        "library": "Biblioteca",
+        "videos": "Vídeos",
+        "documents": "Documentos",
+        "remaining": "restantes"
+    },
+    "settings": {
+        "title": "Configurações",
+        "appearance": "Aparência",
+        "theme": "Tema",
+        "light": "Claro",
+        "dark": "Escuro",
+        "language": "Idioma",
+        "display": "Exibição",
+        "resolution": "Resolução da Janela",
+        "directories": "Diretórios",
+        "manage_dirs": "Gerenciar Diretórios",
+        "add_dir": "Adicionar Diretório",
+        "no_dirs": "Nenhum diretório adicionado",
+        "clear_all": "Limpar Todos",
+        "video": "Vídeo",
+        "skip_backward": "Voltar (segundos)",
+        "skip_forward": "Avançar (segundos)",
+        "advanced": "Avançado",
+        "reset": "Resetar Configurações",
+        "reset_desc": "Restaurar todas as configurações para os valores padrão",
+        "close": "Fechar",
+        "confirm_reset": "Tem certeza que deseja resetar todas as configurações?",
+        "confirm_clear_dirs": "Tem certeza que deseja remover todos os diretórios?",
+        "confirm_remove_dir": "Tem certeza que deseja remover este diretório?",
+        "remove_dir": "Remover Diretório",
+        "portuguese": "Português (Brasil)",
+        "english": "Inglês",
+        "spanish": "Espanhol"
+    },
+    "file_types": {
+        "video": "Vídeo",
+        "document": "Documento"
+    },
+    "breadcrumbs": {
+        "home": "Início"
+    },
+    "video": {
+        "close": "Fechar Vídeo",
+        "watched": "Visto",
+        "mark_as_watched": "Marcar como visto",
+        "episodes": "Episódios",
+        "course_episodes": "Episódios do Curso",
+        "lessons": "aulas",
+        "loading": "Carregando...",
+        "playing_now": "Reproduzindo agora",
+        "lesson": "Aula",
+        "speed": "Velocidade",
+        "quality": "Qualidade",
+        "auto": "Auto",
+        "playback_speed": "Velocidade de Reprodução",
+        "normal": "Normal"
+    },
+    "common": {
+        "items_one": "{{count}} item",
+        "items_other": "{{count}} itens",
+        "files": "arquivos",
+        "folders": "pastas",
+        "confirm": "Confirmar",
+        "cancel": "Cancelar"
+    },
+    "time": {
+        "just_now": "Agora mesmo",
+        "minutes_ago_one": "Há {{count}} minuto",
+        "minutes_ago_other": "Há {{count}} minutos",
+        "hours_ago_one": "Há {{count}} hora",
+        "hours_ago_other": "Há {{count}} horas",
+        "yesterday": "Ontem",
+        "days_ago": "Há {{count}} dias",
+        "seconds_short": "s"
+    },
+    "all_files": {
+        "title": "Todos os Arquivos",
+        "videos": "Vídeos",
+        "documents": "Documentos",
+        "folders_found_one": "{{count}} pasta encontrada",
+        "folders_found_other": "{{count}} pastas encontradas",
+        "show_all": "Mostrar todas as pastas",
+        "group_by_root": "Agrupar por diretórios raiz",
+        "group_by_origin": "Agrupar por Origem",
+        "grid_view": "Visualização em Grade",
+        "list_view": "Visualização em Lista",
+        "sort_by": "Ordenar por:",
+        "sort_name": "Nome",
+        "sort_count": "Qtd. Arquivos",
+        "sort_asc": "Ascendente",
+        "sort_desc": "Descendente",
+        "search_placeholder": "Buscar pastas...",
+        "add": "Adicionar",
+        "add_directory": "Adicionar Diretório",
+        "add_directories": "Adicionar Diretórios",
+        "no_folders_found": "Nenhuma pasta encontrada",
+        "no_dirs_with_files": "Nenhum diretório com arquivos encontrado",
+        "add_to_start": "Adicione diretórios para começar"
+    },
+    "file_browser": {
+        "local_dirs": "Diretórios Locais",
+        "manage_media": "Gerencie seus diretórios de mídia",
+        "search_this_folder": "Buscar nesta pasta...",
+        "search_dirs": "Buscar diretórios...",
+        "loading": "Carregando diretório...",
+        "no_results": "Nenhum resultado encontrado",
+        "empty_folder": "Pasta vazia",
+        "no_dirs_added": "Nenhum diretório encontrado",
+        "click_to_start": "Clique em \"Adicionar Diretório\" para começar"
+    },
+    "document_viewer": {
+        "title": "Visualizador de Documentos",
+        "close": "Fechar Documento",
+        "other_files": "Outros Arquivos",
+        "files_in_folder": "Arquivos na Pasta",
+        "documents": "documentos",
+        "loading": "Carregando..."
+    },
+    "search_bar": {
+        "placeholder_default": "Buscar arquivos e pastas..."
+    },
+    "continue_watching": {
+        "title": "Continuar Assistindo",
+        "subtitle": "Retome de onde você parou",
+        "video_completed": "Vídeo concluído! Continue com o próximo ou assista novamente.",
+        "continue_prompt": "Continue de onde você parou.",
+        "remaining": "Restam",
+        "last_watched": "Última vez:",
+        "watch_again": "Assistir Novamente",
+        "continue": "Continuar Assistindo",
+        "history_title": "Histórico de Reprodução",
+        "no_videos": "Nenhum vídeo em andamento",
+        "start_watching": "Comece a assistir algo para aparecer aqui"
+    },
+    "file_card": {
+        "video": "Vídeo",
+        "document": "Documento"
+    },
+    "directories_view": {
+        "title": "Diretórios Locais",
+        "subtitle": "Gerencie seus diretórios de mídia",
+        "files": "arquivos",
+        "add_directory": "Adicionar Diretório",
+        "no_directories": "Nenhum diretório adicionado",
+        "click_to_start": "Clique em \"Adicionar Diretório\" para começar"
+    },
+    "thumbnail": {
+        "alt": "Miniatura"
+    }
+}
