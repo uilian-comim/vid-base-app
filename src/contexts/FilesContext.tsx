@@ -1,4 +1,4 @@
-import { createContext, useContext, useState, useEffect, ReactNode, useCallback } from 'react';
+import { createContext, useContext, useState, useEffect, ReactNode, useCallback, useMemo } from 'react';
 import { readDir } from '@tauri-apps/plugin-fs';
 import { join } from '@tauri-apps/api/path';
 import { useSettings } from './SettingsContext';
@@ -159,16 +159,16 @@ export function FilesProvider({ children }: { children: ReactNode }) {
     }
   }, []);
 
+  const contextValue = useMemo(() => ({
+    files,
+    directories,
+    isLoading,
+    refreshFiles,
+    listDirectory
+  }), [files, directories, isLoading, refreshFiles, listDirectory]);
+
   return (
-    <FilesContext.Provider
-      value={{
-        files,
-        directories,
-        isLoading,
-        refreshFiles,
-        listDirectory
-      }}
-    >
+    <FilesContext.Provider value={contextValue}>
       {children}
     </FilesContext.Provider>
   );

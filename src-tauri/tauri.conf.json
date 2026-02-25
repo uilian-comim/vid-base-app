@@ -17,7 +17,8 @@
         "height": 800,
         "resizable": true,
         "minWidth": 1024,
-        "minHeight": 768
+        "minHeight": 768,
+        "decorations": false
       }
     ],
     "security": {
@@ -27,7 +28,7 @@
           "**"
         ]
       },
-      "csp": "default-src 'self' asset: http://asset.localhost https://asset.localhost; connect-src 'self' ipc: http://ipc.localhost; img-src 'self' asset: http://asset.localhost https://asset.localhost blob: data:; media-src 'self' asset: http://asset.localhost https://asset.localhost blob: data:; style-src 'self' 'unsafe-inline' https://fonts.googleapis.com; font-src 'self' data: https://fonts.gstatic.com;"
+      "csp": "default-src 'self' asset: http://asset.localhost https://asset.localhost; connect-src 'self' ipc: http://ipc.localhost http://127.0.0.1:8765; img-src 'self' asset: http://asset.localhost https://asset.localhost blob: data: http://127.0.0.1:8765; media-src 'self' asset: http://asset.localhost https://asset.localhost blob: data: http://127.0.0.1:8765; style-src 'self' 'unsafe-inline' https://fonts.googleapis.com; font-src 'self' data: https://fonts.gstatic.com;"
     }
   },
   "bundle": {

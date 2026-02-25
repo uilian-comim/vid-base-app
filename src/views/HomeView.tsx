@@ -127,7 +127,7 @@ export default function HomeView({
                     <div 
                       className="h-full bg-gradient-to-r from-primary to-violet-500 rounded-full shadow-[0_0_10px_rgba(139,92,246,0.3)]"
                       style={{ 
-                        width: `${(lastWatched.currentTime / lastWatched.duration) * 100}%`
+                        width: `${lastWatched.duration > 0 ? (lastWatched.currentTime / lastWatched.duration) * 100 : 0}%`
                       }} 
                     />
                   </div>

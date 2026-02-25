@@ -1,3 +1,4 @@
+import { memo } from 'react';
 import { useTranslation } from 'react-i18next';
 import { motion } from 'framer-motion';
 import { Folder, ChevronRight, File } from 'lucide-react';
@@ -12,7 +13,7 @@ interface DirectoryCardProps {
   index?: number;
 }
 
-export default function DirectoryCard({ 
+export default memo(function DirectoryCard({ 
   name, 
   path, 
   fileCount, 
@@ -112,4 +113,4 @@ export default function DirectoryCard({
       )} />
     </motion.div>
   );
-}
+});

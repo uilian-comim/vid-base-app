@@ -1,20 +1,28 @@
-import { useState } from "react";
+import { useState, lazy, Suspense, useCallback } from "react";
 
 import { useTranslation } from 'react-i18next';
 import { motion, AnimatePresence } from "framer-motion";
 import { SettingsProvider, useSettings } from "./contexts/SettingsContext";
 import { WatchHistoryProvider, useWatchHistory } from "./contexts/WatchHistoryContext";
 import { FilesProvider, useFiles, FileEntry } from "./contexts/FilesContext";
-import Settings from "./views/SettingsView";
-import AllFilesView from "./views/AllFilesView";
-
-import FileBrowserView from "./views/FileBrowserView";
-import ContinueWatchingView from "./views/ContinueWatchingView";
-
-import VideoPlayerView from "./views/VideoPlayerView";
-import DocumentViewer from "./views/DocumentViewer";
-import HomeView from "./views/HomeView";
 import Sidebar from "./components/Sidebar";
+import Titlebar from "./components/Titlebar";
+
+// Lazy Loaded Views
+const Settings = lazy(() => import("./views/SettingsView"));
+const AllFilesView = lazy(() => import("./views/AllFilesView"));
+const FileBrowserView = lazy(() => import("./views/FileBrowserView"));
+const ContinueWatchingView = lazy(() => import("./views/ContinueWatchingView"));
+const VideoPlayerView = lazy(() => import("./views/VideoPlayerView"));
+const DocumentViewer = lazy(() => import("./views/DocumentViewer"));
+const HomeView = lazy(() => import("./views/HomeView"));
+
+// Loading Fallback
+const ViewLoader = () => (
+  <div className="w-full h-full flex items-center justify-center">
+    <div className="w-12 h-12 border-4 border-primary/20 border-t-primary rounded-full animate-spin" />
+  </div>
+);
 
 
 
@@ -36,31 +44,31 @@ function AppContent() {
   // Get last watched video
   const lastWatched = getLastWatched();
 
-  function openFile(file: FileEntry) {
+  const openFile = useCallback((file: FileEntry) => {
     setPlayingFile(file);
-    // Add to watch history when opening a file
-    addToHistory({
-      filePath: file.path,
-      fileName: file.name,
-      fileType: file.file_type,
-      currentTime: 0,
-      duration: 0,
-      completed: false,
-    });
-  }
+    setTimeout(() => {
+        addToHistory({
+          filePath: file.path,
+          fileName: file.name,
+          fileType: file.file_type,
+          currentTime: 0,
+          duration: 0,
+          completed: false,
+        });
+    }, 50);
+  }, [addToHistory]);
 
-  function closePlayer() {
+  const closePlayer = useCallback(() => {
     setPlayingFile(null);
-  }
+  }, []);
 
-  function openDirectorySettings() {
+  const openDirectorySettings = useCallback(() => {
     setActiveNav("configuracoes");
     setShowSettings(true);
-  }
+  }, []);
 
-  function navigateToDirectory(path: string | null) {
+  const navigateToDirectory = useCallback((path: string | null) => {
     if (path === null) {
-       // Sidebar click or explicit reset
        setPreviousTab(null);
        setBrowserRoot(null);
        setBrowserPath(null);
@@ -69,7 +77,6 @@ function AppContent() {
        return;
     }
 
-    // If we are in "arquivos" tab, stay there
     if (activeNav === "arquivos") {
         setBrowserRoot(path);
         setBrowserPath(path);
@@ -84,9 +91,9 @@ function AppContent() {
     setBrowserPath(path);
     setActiveNav("diretorios");
     setShowSettings(false);
-  }
+  }, [activeNav]);
 
-  function handleBrowserNavigate(path: string | null) {
+  const handleBrowserNavigate = useCallback((path: string | null) => {
     if (path === null && previousTab) {
       setActiveNav(previousTab);
       setPreviousTab(null);
@@ -95,13 +102,13 @@ function AppContent() {
     } else {
       setBrowserPath(path);
     }
-  }
+  }, [previousTab]);
 
-  function navigateToType(type: 'video' | 'document' | null) {
+  const navigateToType = useCallback((type: 'video' | 'document' | null) => {
     setFileTypeFilter(type);
     setActiveNav("arquivos");
     setShowSettings(false);
-  }
+  }, []);
 
 
 
@@ -121,12 +128,14 @@ function AppContent() {
   const isPlayingVideo = playingFile && playingFile.file_type === 'video';
 
   return (
-    <div className="flex h-screen w-screen bg-background text-foreground overflow-hidden">
-      {/* Sidebar - Hide if playing video */}
-      {!isPlayingVideo && (
-        <Sidebar 
-          activeNav={activeNav}
-          setActiveNav={setActiveNav}
+    <div className="flex flex-col h-screen w-screen bg-background text-foreground overflow-hidden">
+      <Titlebar />
+      <div className="flex flex-1 h-full w-full overflow-hidden relative">
+        {/* Sidebar - Hide if playing video */}
+        {!isPlayingVideo && (
+          <Sidebar 
+            activeNav={activeNav}
+            setActiveNav={setActiveNav}
           showSettings={showSettings}
           setShowSettings={setShowSettings}
           browserPath={browserPath}
@@ -141,13 +150,11 @@ function AppContent() {
         />
       )}
 
-      {/* Main Content - Hide if playing video (or keep it but hidden to avoid unmounting if expensive? No, unmount is cleaner for now or use styles) */}
-      {/* Actually, if we hide sidebar, we want VideoPlayerView to take full width. VideoPlayerView is fixed and 100vw, so it covers main content anyway. 
-          But hiding sidebar ensures no weird z-index bleeding or pointer events if any. 
-      */}
+      {/* Main Content - Hide if playing video */}
       {!isPlayingVideo && (
       <main className="flex-1 overflow-y-auto overflow-x-hidden bg-background relative">
-        <AnimatePresence mode="wait">
+        <Suspense fallback={<ViewLoader />}>
+          <AnimatePresence mode="wait">
           {showSettings ? (
             <motion.div
               key="settings"
@@ -219,23 +226,22 @@ function AppContent() {
             />
           )}
         </AnimatePresence>
+        </Suspense>
       </main>
       )}
 
       {/* Video Player Overlay */}
-      <AnimatePresence>
+      <Suspense fallback={<ViewLoader />}>
+        <AnimatePresence mode="wait">
         {playingFile && (
           // Using new VideoPlayerView for videos, but keeping fallback for documents if needed or wrapping matches
           playingFile.file_type === 'video' ? (
              <VideoPlayerView 
-                key="video-player"
+                key={playingFile.path}
                 file={playingFile} 
                 onClose={closePlayer} 
                 onPlayFile={openFile}
                 onNavigate={(path) => {
-                     // If navigating via breadcrumbs in player, maybe just close player and navigate browser?
-                     // Or navigate within player Context? 
-                     // Valid decision: Close player and navigate app to that path
                      closePlayer();
                      handleBrowserNavigate(path); 
                      // Also switch tab to files/browser
@@ -286,7 +292,9 @@ function AppContent() {
              />
           )
         )}
-      </AnimatePresence>
+        </AnimatePresence>
+      </Suspense>
+      </div>
     </div>
   );
 }

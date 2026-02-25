@@ -1,4 +1,4 @@
-import { createContext, useContext, useState, useEffect, ReactNode } from 'react';
+import { createContext, useContext, useState, useEffect, ReactNode, useMemo } from 'react';
 import i18n from '../utils/i18n';
 import { getCurrentWindow, LogicalSize } from '@tauri-apps/api/window';
 import { Store } from '@tauri-apps/plugin-store';
@@ -204,23 +204,23 @@ export function SettingsProvider({ children }: { children: ReactNode }) {
     await updateResolution(DEFAULT_SETTINGS.resolution);
   };
 
+  const contextValue = useMemo(() => ({
+    settings,
+    updateTheme,
+    updateLanguage,
+    updateResolution,
+    updateVideoSkipBackward,
+    updateVideoSkipForward,
+    updateGroupByRoot,
+    updateViewMode,
+    addDirectory,
+    removeDirectory,
+    clearAllDirectories,
+    resetSettings,
+  }), [settings]);
+
   return (
-    <SettingsContext.Provider
-      value={{
-        settings,
-        updateTheme,
-        updateLanguage,
-        updateResolution,
-        updateVideoSkipBackward,
-        updateVideoSkipForward,
-        updateGroupByRoot,
-        updateViewMode,
-        addDirectory,
-        removeDirectory,
-        clearAllDirectories,
-        resetSettings,
-      }}
-    >
+    <SettingsContext.Provider value={contextValue}>
       {children}
     </SettingsContext.Provider>
   );

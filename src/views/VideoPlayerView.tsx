@@ -24,7 +24,7 @@ export default function VideoPlayerView({ file, onClose, onPlayFile, onNavigate 
   const containerRef = useRef<HTMLDivElement>(null);
   const controlsTimeoutRef = useRef<number | null>(null);
   
-  const { updateProgress, toggleWatchedStatus, checkWatchedStatus } = useWatchHistory();
+  const { history, updateProgress, toggleWatchedStatus, checkWatchedStatus } = useWatchHistory();
   const { listDirectory } = useFiles();
   const { settings } = useSettings();
   
@@ -49,6 +49,16 @@ export default function VideoPlayerView({ file, onClose, onPlayFile, onNavigate 
   // Preview Tooltip State
   const [previewTime, setPreviewTime] = useState<number | null>(null);
   const [previewLeft, setPreviewLeft] = useState<number>(0);
+
+  // FMP4 Streaming State
+  const initialOffset = (() => {
+      const historyItem = history.find(h => h.filePath === file.path);
+      return historyItem ? historyItem.currentTime : 0;
+  })();
+  const [streamOffset, setStreamOffset] = useState(initialOffset);
+  const streamOffsetRef = useRef(initialOffset);
+  const currentDurationRef = useRef(0);
+  const lastKnownTimeRef = useRef(initialOffset);
 
   // Stabilize listDirectory to prevent effect loops
   const listDirectoryRef = useRef(listDirectory);
@@ -85,6 +95,12 @@ export default function VideoPlayerView({ file, onClose, onPlayFile, onNavigate 
     loadSiblings();
   }, [file.path]); // Removed listDirectory from deps
 
+  const isStreamableFormat = (path: string) => {
+      const lower = path.toLowerCase();
+      // MKV and TS formats will hit the rust Axum server which runs ffmpeg behind the scenes
+      // and converts the stream to fragmented MP4.
+      return lower.endsWith('.ts') || lower.endsWith('.mkv');
+  };
 
   // Video Logic
   useEffect(() => {
@@ -93,18 +109,55 @@ export default function VideoPlayerView({ file, onClose, onPlayFile, onNavigate 
 
     let progressInterval: number;
 
+    const setupStream = async () => {
+        if (isStreamableFormat(file.path)) {
+            try {
+                // 1. Fetch exact duration natively parsed by ffprobe
+                const response = await fetch(`http://127.0.0.1:8765/video-info?path=${encodeURIComponent(file.path)}`);
+                const data = await response.json();
+                if (data.duration) {
+                    setDuration(data.duration);
+                    currentDurationRef.current = data.duration;
+                }
+            } catch (error) {
+                console.error("Failed to get video info:", error);
+            }
+        }
+    };
+    
+    setupStream();
+
     const handleTimeUpdate = () => {
-      setCurrentTime(video.currentTime);
+      let t = video.currentTime;
+      if (isStreamableFormat(file.path)) {
+          t += streamOffsetRef.current;
+      }
+      lastKnownTimeRef.current = t;
+      setCurrentTime(t);
     };
 
     const handleLoadedMetadata = () => {
-      setDuration(video.duration);
+      if (!isStreamableFormat(file.path)) {
+          if (video.duration && video.duration !== Infinity && !isNaN(video.duration)) {
+              setDuration(video.duration);
+              currentDurationRef.current = video.duration;
+          }
+      }
+      
+      
       progressInterval = window.setInterval(() => {
-         if (video.currentTime > 0 && video.duration > 0) {
-           updateProgress(file.path, video.currentTime, video.duration);
+         let t = lastKnownTimeRef.current;
+         if (t > 0) {
+           updateProgress(file.path, t, currentDurationRef.current);
          }
        }, 5000);
     };
+
+    if (video.readyState >= 1) {
+        handleLoadedMetadata();
+    } else {
+        video.addEventListener('loadedmetadata', handleLoadedMetadata);
+    }
 
     const handlePlayPause = () => setIsPlaying(!video.paused);
     const handleVolumeChange = () => {
@@ -115,7 +168,8 @@ export default function VideoPlayerView({ file, onClose, onPlayFile, onNavigate 
 
     const handleEnded = () => {
       setIsPlaying(false);
-      updateProgress(file.path, video.duration, video.duration);
+      const d = currentDurationRef.current;
+      updateProgress(file.path, d, d);
     };
 
     video.addEventListener('timeupdate', handleTimeUpdate);
@@ -136,18 +190,42 @@ export default function VideoPlayerView({ file, onClose, onPlayFile, onNavigate 
       video.removeEventListener('ratechange', handleRateChange);
       video.removeEventListener('ended', handleEnded);
       
-      if (video.currentTime > 0 && video.duration > 0) {
-        updateProgress(file.path, video.currentTime, video.duration);
+      let t = lastKnownTimeRef.current;
+      if (t > 0) {
+        updateProgress(file.path, t, currentDurationRef.current);
+      }
+      
+      // Explicitly stop playback and release the video source
+      try {
+        video.pause();
+        video.volume = 0;
+        video.muted = true;
+        video.removeAttribute('src');
+        video.src = "";
+        video.load();
+      } catch (e) {
+        // Ignore load errors on unmount
       }
     };
   }, [file.path, updateProgress]);
 
-  // Restore time
-  const { history } = useWatchHistory();
+  // Restore time for non-streamable formats
   const lastRestoredPathRef = useRef<string | null>(null);
 
   useEffect(() => {
       if (lastRestoredPathRef.current === file.path) return;
+      
+      const playVideo = () => {
+          if (videoRef.current) {
+              const p = videoRef.current.play();
+              if (p !== undefined) p.catch(() => {});
+          }
+      };
+
+      if (isStreamableFormat(file.path)) {
+          playVideo();
+          return; // natively handled by URL parameter
+      }
 
       const historyItem = history.find(h => h.filePath === file.path);
       if (historyItem && videoRef.current) {
@@ -155,6 +233,7 @@ export default function VideoPlayerView({ file, onClose, onPlayFile, onNavigate 
           const restoreTime = () => {
              if (videoRef.current && !videoRef.current.played.length) { 
                  videoRef.current.currentTime = historyItem.currentTime;
+                 playVideo();
              }
           }
           if (videoRef.current.readyState >= 1) {
@@ -162,6 +241,8 @@ export default function VideoPlayerView({ file, onClose, onPlayFile, onNavigate 
           } else {
               videoRef.current.addEventListener('loadedmetadata', restoreTime, { once: true });
           }
+      } else {
+          playVideo();
       }
   }, [file.path, history]);
 
@@ -174,17 +255,45 @@ export default function VideoPlayerView({ file, onClose, onPlayFile, onNavigate 
 
   const handleSeek = useCallback((e: React.ChangeEvent<HTMLInputElement>) => {
       const time = parseFloat(e.target.value);
-      if (videoRef.current) {
-          videoRef.current.currentTime = time;
-          setCurrentTime(time);
+      if (isStreamableFormat(file.path)) {
+          streamOffsetRef.current = time;
+          setStreamOffset(time); // React will update `<video src>` to the exact timestamp
+          if (videoRef.current) {
+              setTimeout(() => {
+                  if (videoRef.current) {
+                      videoRef.current.load();
+                      const p = videoRef.current.play();
+                      if (p !== undefined) p.catch(() => {});
+                  }
+              }, 50);
+          }
+      } else {
+          if (videoRef.current) {
+              videoRef.current.currentTime = time;
+          }
       }
-  }, []);
+      setCurrentTime(time);
+  }, [file.path]);
 
   const skip = useCallback((seconds: number) => {
       if (videoRef.current) {
-          videoRef.current.currentTime += seconds;
+          let expectedTime = (isStreamableFormat(file.path) ? streamOffsetRef.current + videoRef.current.currentTime : videoRef.current.currentTime) + seconds;
+          expectedTime = Math.max(0, expectedTime); // prevent negative seek
+          if (isStreamableFormat(file.path)) {
+              streamOffsetRef.current = expectedTime;
+              setStreamOffset(expectedTime);
+              setTimeout(() => {
+                  if (videoRef.current) {
+                      videoRef.current.load();
+                      const p = videoRef.current.play();
+                      if (p !== undefined) p.catch(() => {});
+                  }
+              }, 50);
+          } else {
+              videoRef.current.currentTime += seconds;
+          }
       }
-  }, []);
+  }, [file.path]);
 
   // Keyboard shortcuts
   useEffect(() => {
@@ -311,11 +420,11 @@ export default function VideoPlayerView({ file, onClose, onPlayFile, onNavigate 
             <video 
               key={file.path}
               ref={videoRef}
-              autoPlay 
               className="w-full h-full object-contain"
-            >
-              <source src={convertFileSrc(file.path)} type="video/mp4" />
-            </video>
+              src={isStreamableFormat(file.path) 
+                  ? `http://127.0.0.1:8765/play?path=${encodeURIComponent(file.path)}&start=${streamOffset}`
+                  : convertFileSrc(file.path)}
+            />
             
             {/* Play overlay when paused */}
             {!isPlaying && (
@@ -356,6 +465,7 @@ export default function VideoPlayerView({ file, onClose, onPlayFile, onNavigate 
                 setPlaybackRate={setPlaybackRate}
                 videoHeight={videoRef.current?.videoHeight}
                 onPlaybackRateChange={handlePlaybackRateChange}
+                isStreamableFormat={isStreamableFormat(file.path)}
             />
           </div>
 

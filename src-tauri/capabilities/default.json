@@ -48,6 +48,7 @@
       ]
     },
     "store:default",
-    "dialog:default"
+    "dialog:default",
+    "core:window:default"
   ]
 }

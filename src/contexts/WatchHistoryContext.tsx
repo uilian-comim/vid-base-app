@@ -1,4 +1,4 @@
-import { createContext, useContext, useState, useEffect, ReactNode } from 'react';
+import { createContext, useContext, useState, useEffect, ReactNode, useCallback, useMemo } from 'react';
 import { Store } from '@tauri-apps/plugin-store';
 import { documentDir, join } from '@tauri-apps/api/path';
 import { exists, mkdir } from '@tauri-apps/plugin-fs';
@@ -100,7 +100,7 @@ export function WatchHistoryProvider({ children }: { children: ReactNode }) {
     saveHistory();
   }, [history, isLoaded]);
 
-  const addToHistory = (entry: Omit<WatchHistoryEntry, 'lastWatchedAt'>) => {
+  const addToHistory = useCallback((entry: Omit<WatchHistoryEntry, 'lastWatchedAt'>) => {
     setHistory(prev => {
       const existing = prev.find(item => item.filePath === entry.filePath);
       const filtered = prev.filter(item => item.filePath !== entry.filePath);
@@ -116,9 +116,9 @@ export function WatchHistoryProvider({ children }: { children: ReactNode }) {
       
       return updated;
     });
-  };
+  }, []);
 
-  const updateProgress = (filePath: string, currentTime: number, duration: number) => {
+  const updateProgress = useCallback((filePath: string, currentTime: number, duration: number) => {
     setHistory(prev => {
       const index = prev.findIndex(item => item.filePath === filePath);
       
@@ -128,7 +128,7 @@ export function WatchHistoryProvider({ children }: { children: ReactNode }) {
       const item = updated[index];
       
       // Consider video completed if watched more than 95% or within 10 seconds of end
-      const completed = currentTime >= duration - 10 || (currentTime / duration) >= 0.95;
+      const completed = duration > 0 ? (currentTime >= duration - 10 || (currentTime / duration) >= 0.95) : false;
       
       updated[index] = {
         ...item,
@@ -144,9 +144,9 @@ export function WatchHistoryProvider({ children }: { children: ReactNode }) {
       
       return updated;
     });
-  };
+  }, []);
 
-  const toggleWatchedStatus = (filePath: string, isWatched: boolean) => {
+  const toggleWatchedStatus = useCallback((filePath: string, isWatched: boolean) => {
     setHistory(prev => {
       const index = prev.findIndex(item => item.filePath === filePath);
       
@@ -176,12 +176,12 @@ export function WatchHistoryProvider({ children }: { children: ReactNode }) {
       
       return updated;
     });
-  };
+  }, []);
 
-  const checkWatchedStatus = (filePath: string): boolean => {
+  const checkWatchedStatus = useCallback((filePath: string): boolean => {
       const item = history.find(i => i.filePath === filePath);
       return item ? item.completed : false;
-  };
+  }, [history]);
 
   const isValidPath = (filePath: string) => {
     if (settings.directories.length === 0) return false;
@@ -190,36 +190,36 @@ export function WatchHistoryProvider({ children }: { children: ReactNode }) {
     return settings.directories.some(dir => normFile.startsWith(normalize(dir)));
   };
 
-  const getLastWatched = (): WatchHistoryEntry | null => {
+  const getLastWatched = useCallback((): WatchHistoryEntry | null => {
     if (history.length === 0) return null;
     // Find the first item that is a video and still in configured directories
     return history.find(item => item.fileType === 'video' && isValidPath(item.filePath)) || null;
-  };
+  }, [history, settings.directories]);
 
-  const getContinueWatching = (): WatchHistoryEntry[] => {
+  const getContinueWatching = useCallback((): WatchHistoryEntry[] => {
     // Return videos that are not completed, sorted by last watched and in configured directories
     return history
       .filter(item => item.fileType === 'video' && !item.completed && isValidPath(item.filePath))
       .slice(0, 10);
-  };
+  }, [history, settings.directories]);
 
-  const clearHistory = () => {
+  const clearHistory = useCallback(() => {
     setHistory([]);
-  };
+  }, []);
+
+  const contextValue = useMemo(() => ({
+    history,
+    addToHistory,
+    updateProgress,
+    getLastWatched,
+    getContinueWatching,
+    clearHistory,
+    toggleWatchedStatus,
+    checkWatchedStatus,
+  }), [history, addToHistory, updateProgress, getLastWatched, getContinueWatching, clearHistory, toggleWatchedStatus, checkWatchedStatus]);
 
   return (
-    <WatchHistoryContext.Provider
-      value={{
-        history,
-        addToHistory,
-        updateProgress,
-        getLastWatched,
-        getContinueWatching,
-        clearHistory,
-        toggleWatchedStatus,
-        checkWatchedStatus,
-      }}
-    >
+    <WatchHistoryContext.Provider value={contextValue}>
       {children}
     </WatchHistoryContext.Provider>
   );

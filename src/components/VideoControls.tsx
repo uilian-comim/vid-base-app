@@ -34,6 +34,7 @@ interface VideoControlsProps {
   setPlaybackRate: (rate: number) => void;
   videoHeight?: number;
   onPlaybackRateChange: (rate: number) => void;
+  isStreamableFormat: boolean;
 }
 
 export default function VideoControls({
@@ -62,7 +63,8 @@ export default function VideoControls({
   setActiveMenu,
   playbackRate,
   videoHeight,
-  onPlaybackRateChange
+  onPlaybackRateChange,
+  isStreamableFormat
 }: VideoControlsProps) {
   const { settings } = useSettings();
 
@@ -90,16 +92,26 @@ export default function VideoControls({
                 className="absolute bottom-8 -translate-x-1/2 bg-zinc-900 border border-white/10 rounded-xl p-1 flex flex-col items-center pointer-events-none z-20 shadow-2xl overflow-hidden min-w-[160px]"
                 style={{ left: previewLeft }}
               >
-                <div className="w-[180px] aspect-video bg-black flex items-center justify-center overflow-hidden rounded-lg relative">
-                  <video
-                    ref={previewVideoRef}
-                    src={convertFileSrc(filePath)}
-                    className="w-full h-full object-cover"
-                    muted
-                    preload="auto"
-                    disablePictureInPicture
-                  />
-                </div>
+                {!isStreamableFormat ? (
+                  <div className="w-[180px] aspect-video bg-black flex items-center justify-center overflow-hidden rounded-lg relative">
+                    <video
+                      ref={previewVideoRef}
+                      src={convertFileSrc(filePath)}
+                      className="w-full h-full object-cover"
+                      muted
+                      preload="auto"
+                      disablePictureInPicture
+                    />
+                  </div>
+                ) : (
+                  <div className="w-[180px] aspect-video bg-black flex items-center justify-center overflow-hidden rounded-lg relative">
+                    <img 
+                      src={`http://127.0.0.1:8765/thumbnail?path=${encodeURIComponent(filePath)}&time=${previewTime !== null ? Math.floor(previewTime) : 0}`}
+                      className="w-full h-full object-cover"
+                      alt="Preview"
+                    />
+                  </div>
+                )}
                 <span className="w-full text-center py-2 text-base font-bold text-white font-sans tracking-wide drop-shadow-md">{formatTime(previewTime)}</span>
               </div>
             )}

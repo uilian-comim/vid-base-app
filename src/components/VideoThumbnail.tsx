@@ -22,6 +22,10 @@ export default function VideoThumbnail({ filePath, time, className, maxWidth = 3
     video.crossOrigin = 'anonymous';
     video.currentTime = time;
     video.muted = true;
+    // Extra safety locks
+    video.volume = 0;
+    video.autoplay = false;
+    video.playsInline = true;
     video.preload = 'metadata';
 
     const onSeeked = () => {
@@ -42,7 +46,16 @@ export default function VideoThumbnail({ filePath, time, className, maxWidth = 3
         }
       }
       
-      // Cleanup
+      // Cleanup aggressively to prevent ghost playback leaks
+      try {
+        video.pause();
+        video.volume = 0;
+        video.muted = true;
+        video.removeAttribute('src');
+        video.src = '';
+        video.load();
+      } catch (e) {}
+      
       video.remove();
       video = null;
     };
@@ -63,9 +76,16 @@ export default function VideoThumbnail({ filePath, time, className, maxWidth = 3
         video.removeEventListener('loadedmetadata', onLoadedMetadata);
         video.removeEventListener('seeked', onSeeked);
         video.remove();
-        video.pause();
-        video.removeAttribute('src'); // Helper to stop loading
-        video.load();
+        
+        try {
+          video.pause();
+          video.volume = 0;
+          video.muted = true;
+          video.removeAttribute('src');
+          video.src = '';
+          video.load();
+        } catch (e) {}
+        
         video = null;
       }
     };

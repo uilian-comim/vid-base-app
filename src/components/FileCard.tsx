@@ -1,3 +1,4 @@
+import { memo } from 'react';
 import { motion } from 'framer-motion';
 import { useTranslation } from 'react-i18next';
 import { FileVideo, FileText, Clock, CheckCircle } from 'lucide-react';
@@ -15,7 +16,7 @@ interface FileCardProps {
   completed?: boolean;
 }
 
-export default function FileCard({ 
+export default memo(function FileCard({ 
   file, 
   onClick, 
   index = 0,
@@ -103,4 +104,4 @@ export default function FileCard({
       )}
     </motion.div>
   );
-}
+});
