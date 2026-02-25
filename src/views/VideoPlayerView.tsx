@@ -7,8 +7,9 @@ import { FileEntry, useFiles } from '../contexts/FilesContext';
 import { useWatchHistory } from '../contexts/WatchHistoryContext';
 import { useSettings } from '../contexts/SettingsContext';
 import { cn } from "@/lib/utils";
-import VideoControls from '../components/VideoControls';
-import EpisodesList from '../components/EpisodesList';
+import VideoControls from '../components/player/VideoControls';
+import EpisodesList from '../components/player/EpisodesList';
+import { useVideoShortcuts } from '../hooks/useVideoShortcuts';
 
 interface VideoPlayerViewProps {
   file: FileEntry;
@@ -195,16 +196,11 @@ export default function VideoPlayerView({ file, onClose, onPlayFile, onNavigate 
         updateProgress(file.path, t, currentDurationRef.current);
       }
       
-      // Explicitly stop playback and release the video source
+      // Explicitly stop playback
       try {
         video.pause();
-        video.volume = 0;
-        video.muted = true;
-        video.removeAttribute('src');
-        video.src = "";
-        video.load();
       } catch (e) {
-        // Ignore load errors on unmount
+        // Ignore errors on unmount
       }
     };
   }, [file.path, updateProgress]);
@@ -218,7 +214,7 @@ export default function VideoPlayerView({ file, onClose, onPlayFile, onNavigate 
       const playVideo = () => {
           if (videoRef.current) {
               const p = videoRef.current.play();
-              if (p !== undefined) p.catch(() => {});
+              if (p !== undefined) p.catch((e) => console.warn("Auto-play failed:", e));
           }
       };
 
@@ -248,7 +244,10 @@ export default function VideoPlayerView({ file, onClose, onPlayFile, onNavigate 
 
   const togglePlay = useCallback(() => {
     if (videoRef.current) {
-        if (videoRef.current.paused) videoRef.current.play();
+        if (videoRef.current.paused) {
+            const p = videoRef.current.play();
+            if (p !== undefined) p.catch((e) => console.warn("Play failed:", e));
+        }
         else videoRef.current.pause();
     }
   }, []);
@@ -296,30 +295,12 @@ export default function VideoPlayerView({ file, onClose, onPlayFile, onNavigate 
   }, [file.path]);
 
   // Keyboard shortcuts
-  useEffect(() => {
-    const handleKeyDown = (e: KeyboardEvent) => {
-      // Ignore if user is typing in an input
-      if (e.target instanceof HTMLInputElement || e.target instanceof HTMLTextAreaElement) {
-        return;
-      }
-
-      switch (e.key) {
-        case 'ArrowLeft':
-          skip(-settings.videoSkipBackward);
-          break;
-        case 'ArrowRight':
-          skip(settings.videoSkipForward);
-          break;
-        case ' ':
-          e.preventDefault(); // Prevent scrolling
-          togglePlay();
-          break;
-      }
-    };
-
-    window.addEventListener('keydown', handleKeyDown);
-    return () => window.removeEventListener('keydown', handleKeyDown);
-  }, [skip, settings.videoSkipBackward, settings.videoSkipForward, togglePlay]);
+  useVideoShortcuts({
+    skip,
+    togglePlay,
+    videoSkipBackward: settings.videoSkipBackward,
+    videoSkipForward: settings.videoSkipForward
+  });
 
   const toggleMute = useCallback(() => {
       if (videoRef.current) {
@@ -391,7 +372,7 @@ export default function VideoPlayerView({ file, onClose, onPlayFile, onNavigate 
 
   return (
     <motion.div 
-      className="fixed inset-0 z-50 bg-background flex flex-col"
+      className={cn("fixed z-50 bg-background flex flex-col", isFullscreen ? "inset-0" : "inset-x-0 bottom-0 top-8")}
       initial={{ opacity: 0 }}
       animate={{ opacity: 1 }}
       exit={{ opacity: 0 }}
@@ -406,7 +387,7 @@ export default function VideoPlayerView({ file, onClose, onPlayFile, onNavigate 
         </button>
       </div>
 
-      <div className={cn("grid h-screen overflow-hidden", showSidebar ? "grid-cols-[1fr_400px]" : "grid-cols-1")}>
+      <div className={cn("grid h-full overflow-hidden", showSidebar ? "grid-cols-[1fr_400px]" : "grid-cols-1")}>
         {/* Main Player Area */}
         <div className="p-8 pr-16 bg-black relative flex flex-col justify-center overflow-y-auto scrollbar-thin scrollbar-track-transparent scrollbar-thumb-white/10 hover:scrollbar-thumb-white/20">
           <div 

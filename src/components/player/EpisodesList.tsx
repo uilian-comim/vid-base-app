@@ -3,7 +3,7 @@ import { Check } from 'lucide-react';
 import { useTranslation } from 'react-i18next';
 import { cn } from "@/lib/utils";
 import VideoThumbnail from './VideoThumbnail';
-import { FileEntry } from '../contexts/FilesContext';
+import { FileEntry } from '../../contexts/FilesContext';
 
 interface EpisodesListProps {
   siblings: FileEntry[];

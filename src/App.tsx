@@ -5,7 +5,7 @@ import { motion, AnimatePresence } from "framer-motion";
 import { SettingsProvider, useSettings } from "./contexts/SettingsContext";
 import { WatchHistoryProvider, useWatchHistory } from "./contexts/WatchHistoryContext";
 import { FilesProvider, useFiles, FileEntry } from "./contexts/FilesContext";
-import Sidebar from "./components/Sidebar";
+import Sidebar from "./components/layout/Sidebar/Sidebar";
 import Titlebar from "./components/Titlebar";
 
 // Lazy Loaded Views
@@ -110,6 +110,31 @@ function AppContent() {
     setShowSettings(false);
   }, []);
 
+  const handleCloseSettings = useCallback(() => {
+    setShowSettings(false);
+    setActiveNav("inicio");
+  }, []);
+
+  const handlePlayerNavigate = useCallback((path: string) => {
+    closePlayer();
+    handleBrowserNavigate(path); 
+    setActiveNav('arquivos');
+    setBrowserPath(path);
+    if (path) {
+      setBrowserPath(path);
+      const normalize = (p: string) => p.toLowerCase().replace(/[\\/]/g, '/');
+      
+      const sortedDirs = [...directories].sort((a, b) => b.path.length - a.path.length);
+      const matchedRoot = sortedDirs.find(dir => {
+          const normPath = normalize(path);
+          const normDir = normalize(dir.path);
+          return normPath.startsWith(normDir);
+      });
+      
+      setBrowserRoot(matchedRoot ? matchedRoot.path : path);
+    }
+  }, [closePlayer, handleBrowserNavigate, directories]);
+
 
 
   // Get recent files (last 3)
@@ -163,10 +188,7 @@ function AppContent() {
               exit={{ opacity: 0, x: -20 }}
               transition={{ duration: 0.3 }}
             >
-              <Settings onClose={() => {
-                setShowSettings(false);
-                setActiveNav("inicio");
-              }} />
+              <Settings onClose={handleCloseSettings} />
             </motion.div>
           ) : activeNav === "continuar" ? (
             <motion.div
@@ -241,27 +263,7 @@ function AppContent() {
                 file={playingFile} 
                 onClose={closePlayer} 
                 onPlayFile={openFile}
-                onNavigate={(path) => {
-                     closePlayer();
-                     handleBrowserNavigate(path); 
-                     // Also switch tab to files/browser
-                     setActiveNav('arquivos');
-                     setBrowserPath(path);
-                     if (path) {
-                       setBrowserPath(path);
-                       // Find if this path belongs to a registered directory
-                       const normalize = (p: string) => p.toLowerCase().replace(/[\\/]/g, '/');
-                       
-                       const sortedDirs = [...directories].sort((a, b) => b.path.length - a.path.length);
-                       const matchedRoot = sortedDirs.find(dir => {
-                           const normPath = normalize(path);
-                           const normDir = normalize(dir.path);
-                           return normPath.startsWith(normDir);
-                       });
-                       
-                       setBrowserRoot(matchedRoot ? matchedRoot.path : path);
-                     }
-                }}
+                onNavigate={handlePlayerNavigate}
              />
           ) : (
              // Simple PDF viewer fallback (keeping existing style for now, or wrapping)
@@ -270,25 +272,7 @@ function AppContent() {
                 file={playingFile}
                 onClose={closePlayer}
                 onOpenFile={openFile}
-                onNavigate={(path) => {
-                     closePlayer();
-                     handleBrowserNavigate(path); 
-                     setActiveNav('arquivos');
-                     setBrowserPath(path);
-                     if (path) {
-                       setBrowserPath(path);
-                       const normalize = (p: string) => p.toLowerCase().replace(/[\\/]/g, '/');
-                       
-                       const sortedDirs = [...directories].sort((a, b) => b.path.length - a.path.length);
-                       const matchedRoot = sortedDirs.find(dir => {
-                           const normPath = normalize(path);
-                           const normDir = normalize(dir.path);
-                           return normPath.startsWith(normDir);
-                       });
-                       
-                       setBrowserRoot(matchedRoot ? matchedRoot.path : path);
-                     }
-                }}
+                onNavigate={handlePlayerNavigate}
              />
           )
         )}

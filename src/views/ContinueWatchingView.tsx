@@ -1,7 +1,7 @@
 import { motion } from 'framer-motion';
 import { useTranslation } from 'react-i18next';
 import { useWatchHistory } from '../contexts/WatchHistoryContext';
-import VideoThumbnail from '../components/VideoThumbnail';
+import VideoThumbnail from '../components/player/VideoThumbnail';
 import FileCard from '../components/FileCard';
 import PathTooltip from '../components/PathTooltip';
 import { Play, Clock } from 'lucide-react';

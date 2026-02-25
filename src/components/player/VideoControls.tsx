@@ -2,9 +2,9 @@ import { motion, AnimatePresence } from 'framer-motion';
 import { Play, Pause, SkipBack, SkipForward, VolumeX, Volume2, Settings, Minimize, Maximize } from 'lucide-react';
 import { cn } from "@/lib/utils";
 import PlayerSettingsMenu from './PlayerSettingsMenu';
-import { formatTime } from '../utils/utils';
+import { formatTime } from '../../utils/utils';
 import { convertFileSrc } from '@tauri-apps/api/core';
-import { useSettings } from '../contexts/SettingsContext';
+import { useSettings } from '../../contexts/SettingsContext';
 
 interface VideoControlsProps {
   show: boolean;
