@@ -5,12 +5,14 @@ import { Wrench, RotateCcw, Trash2 } from 'lucide-react';
 import { invoke } from '@tauri-apps/api/core';
 import { useSettings } from '../../contexts/SettingsContext';
 import { useWatchHistory } from '../../contexts/WatchHistoryContext';
+import { useToast } from '../../contexts/ToastContext';
 import ConfirmationModal from '../ConfirmationModal';
 
 export default function AdvancedSettings() {
   const { t } = useTranslation();
   const { resetSettings } = useSettings();
   const { clearHistory } = useWatchHistory();
+  const { showToast } = useToast();
 
   const [modalOpen, setModalOpen] = useState(false);
   const [modalConfig, setModalConfig] = useState<{
@@ -26,10 +28,16 @@ export default function AdvancedSettings() {
   });
 
   const handleResetSettings = async () => {
-    if (confirm(t('settings.confirm_reset'))) {
-      await resetSettings();
-      window.location.reload(); 
-    }
+    setModalConfig({
+        title: t('settings.reset'),
+        message: t('settings.confirm_reset'),
+        onConfirm: async () => {
+          await resetSettings();
+          showToast(t('settings.reset_success', 'Settings successfully restored.'), 'success');
+        },
+        variant: 'danger'
+    });
+    setModalOpen(true);
   };
 
   const executeClearCache = async () => {
@@ -43,10 +51,10 @@ export default function AdvancedSettings() {
       // 3. Clear the watch history
       clearHistory();
       
-      alert(t('settings.cache_cleared', 'Video cache successfully cleared.'));
+      showToast(t('settings.cache_cleared', 'Video cache successfully cleared.'), 'success');
     } catch (error) {
       console.error(error);
-      alert(t('settings.cache_clear_error', 'Error clearing cache. A video might currently be playing.'));
+      showToast(t('settings.cache_clear_error', 'Error clearing cache. A video might currently be playing.'), 'error');
     }
   };
 
@@ -77,36 +85,51 @@ export default function AdvancedSettings() {
       />
       
       <div className="flex items-center gap-3 mb-2 text-primary">
-        <Wrench size={24} />
-        <h2 className="text-xl font-bold font-heading m-0 text-foreground">{t('settings.advanced')}</h2>
+        <div className="w-10 h-10 rounded-full bg-primary/10 flex items-center justify-center">
+          <Wrench size={20} />
+        </div>
+        <div>
+          <h2 className="text-xl font-bold font-heading m-0 text-foreground">{t('settings.advanced')}</h2>
+          <p className="text-xs text-muted-foreground mt-0.5">{t('settings.advanced_desc', 'Manage advanced application preferences and data.')}</p>
+        </div>
       </div>
       
-      <div className="flex flex-col gap-4 bg-red-500/5 border border-red-500/10 rounded-xl p-5 backdrop-blur-sm">
-        <label className="text-sm font-medium text-foreground mb-1 block">{t('settings.reset')}</label>
-        <p className="text-sm text-muted-foreground">{t('settings.reset_desc')}</p>
-        <motion.button 
-          className="flex items-center justify-center gap-2 px-6 py-2.5 bg-destructive text-destructive-foreground rounded-lg font-medium transition-all hover:bg-destructive/90 hover:shadow-lg hover:shadow-destructive/20 active:scale-[0.98] w-full sm:w-auto" 
-          onClick={handleResetSettings}
-          whileHover={{ scale: 1.02 }}
-          whileTap={{ scale: 0.98 }}
-        >
-          <RotateCcw size={18} />
-          {t('settings.reset')}
-        </motion.button>
-      </div>
+      <div className="flex flex-col gap-4 mt-2">
+        <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4 bg-orange-500/5 border border-orange-500/10 rounded-xl p-5 backdrop-blur-sm group hover:bg-orange-500/10 transition-colors">
+          <div className="flex-1 pr-4">
+            <label className="text-base font-medium text-foreground mb-1 flex items-center gap-2">
+              <Trash2 size={16} className="text-orange-500" />
+              {t('settings.clear_cache', 'Clear Video Cache')}
+            </label>
+            <p className="text-sm text-muted-foreground leading-relaxed">{t('settings.clear_cache_desc', 'Deletes temporary video streaming files (.ts, .mkv) to free up disk space.')}</p>
+          </div>
+          <motion.button 
+            className="flex-shrink-0 flex items-center justify-center px-6 py-2.5 bg-orange-500/10 text-orange-500 rounded-lg font-medium transition-all hover:bg-orange-500 hover:text-white active:scale-[0.98] w-full sm:w-auto mt-2 sm:mt-0" 
+            onClick={handleClearCache}
+            whileHover={{ scale: 1.02 }}
+            whileTap={{ scale: 0.98 }}
+          >
+            {t('settings.clear_cache', 'Clear Video Cache')}
+          </motion.button>
+        </div>
 
-      <div className="flex flex-col gap-4 bg-orange-500/5 border border-orange-500/10 rounded-xl p-5 backdrop-blur-sm mt-4">
-        <label className="text-sm font-medium text-foreground mb-1 block">{t('settings.clear_cache', 'Clear Video Cache')}</label>
-        <p className="text-sm text-muted-foreground">{t('settings.clear_cache_desc', 'Deletes temporary video streaming files (.ts, .mkv) to free up disk space.')}</p>
-        <motion.button 
-          className="flex items-center justify-center gap-2 px-6 py-2.5 bg-orange-500/10 text-orange-500 rounded-lg font-medium transition-all hover:bg-orange-500 hover:text-white active:scale-[0.98] w-full sm:w-auto" 
-          onClick={handleClearCache}
-          whileHover={{ scale: 1.02 }}
-          whileTap={{ scale: 0.98 }}
-        >
-          <Trash2 size={18} />
-          {t('settings.clear_cache', 'Clear Video Cache')}
-        </motion.button>
+        <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4 bg-destructive/5 border border-destructive/10 rounded-xl p-5 backdrop-blur-sm group hover:bg-destructive/10 transition-colors">
+          <div className="flex-1 pr-4">
+            <label className="text-base font-medium text-foreground mb-1 flex items-center gap-2">
+              <RotateCcw size={16} className="text-destructive" />
+              {t('settings.reset')}
+            </label>
+            <p className="text-sm text-muted-foreground leading-relaxed">{t('settings.reset_desc')}</p>
+          </div>
+          <motion.button 
+            className="flex-shrink-0 flex items-center justify-center px-6 py-2.5 bg-destructive/10 text-destructive rounded-lg font-medium transition-all hover:bg-destructive hover:text-destructive-foreground active:scale-[0.98] w-full sm:w-auto mt-2 sm:mt-0" 
+            onClick={handleResetSettings}
+            whileHover={{ scale: 1.02 }}
+            whileTap={{ scale: 0.98 }}
+          >
+            {t('settings.reset')}
+          </motion.button>
+        </div>
       </div>
     </motion.section>
   );

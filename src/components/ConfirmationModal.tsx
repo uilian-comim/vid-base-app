@@ -67,7 +67,7 @@ export default function ConfirmationModal({
                 <div className="flex gap-3 w-full mt-2">
                   <button
                     onClick={onClose}
-                    className="flex-1 px-4 py-2.5 rounded-xl text-sm font-medium bg-secondary text-secondary-foreground hover:bg-secondary/80 transition-colors"
+                    className="flex-1 px-4 py-2.5 rounded-xl text-sm font-medium bg-secondary/50 text-secondary-foreground hover:bg-secondary transition-colors"
                   >
                     {cancelText || t('common.cancel')}
                   </button>
@@ -76,10 +76,10 @@ export default function ConfirmationModal({
                       onConfirm();
                       onClose();
                     }}
-                    className={`flex-1 px-4 py-2.5 rounded-xl text-sm font-medium text-white transition-colors shadow-lg ${
+                    className={`flex-1 px-4 py-2.5 rounded-xl text-sm font-medium transition-all ${
                       variant === 'danger' 
-                        ? 'bg-destructive hover:bg-destructive/90 shadow-destructive/20' 
-                        : 'bg-primary hover:bg-primary/90 shadow-primary/20'
+                        ? 'bg-destructive/10 text-destructive hover:bg-destructive hover:text-destructive-foreground' 
+                        : 'bg-primary/10 text-primary hover:bg-primary hover:text-primary-foreground'
                     }`}
                   >
                     {confirmText || t('common.confirm')}

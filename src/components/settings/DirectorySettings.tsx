@@ -140,7 +140,7 @@ export default function DirectorySettings() {
           </motion.button>
           {settings.directories.length > 0 && (
             <motion.button 
-              className="flex items-center justify-center gap-2 px-4 py-2 bg-muted text-muted-foreground rounded-lg font-medium hover:bg-muted/80 hover:text-foreground transition-all text-sm" 
+              className="flex items-center justify-center gap-2 px-4 py-2 bg-destructive/10 text-destructive rounded-lg font-medium hover:bg-destructive hover:text-destructive-foreground transition-all text-sm" 
               onClick={handleClearDirectories}
               whileHover={{ scale: 1.02 }}
               whileTap={{ scale: 0.98 }}

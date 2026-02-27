@@ -82,10 +82,10 @@ const Sidebar = React.memo(({
       />
 
       {/* Settings Button */}
-      <div className="mt-auto pt-4">
+      <div className="mt-auto pt-4 w-full flex flex-col">
         <motion.button
           className={cn(
-            "flex items-center gap-2 mx-4 mb-4 p-3 px-4 bg-sidebar-primary text-sidebar-primary-foreground border-none rounded-md text-sm font-medium cursor-pointer transition-all shadow-sm hover:bg-sidebar-primary/90 hover:shadow-md",
+            "flex items-center justify-center gap-2 mx-4 mb-4 p-3 active:scale-95 bg-sidebar-primary text-sidebar-primary-foreground border-none rounded-md text-sm font-medium cursor-pointer transition-all shadow-sm hover:bg-sidebar-primary/90 hover:shadow-md",
             showSettings && "bg-sidebar-primary/90 shadow-md ring-2 ring-sidebar-ring ring-offset-2"
           )}
           onClick={() => setShowSettings(true)}

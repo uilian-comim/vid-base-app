@@ -6,6 +6,7 @@ import DirectoryCard from '../components/DirectoryCard';
 import SearchBar from '../components/SearchBar';
 import { Plus, LayoutGrid, List, ArrowUpAZ, ArrowDownAZ, Folder, ChevronRight, Layers } from 'lucide-react';
 import { useSettings } from '../contexts/SettingsContext';
+import Select from '../components/Select';
 
 interface AllFilesViewProps {
   files: FileEntry[];
@@ -153,14 +154,15 @@ export default function AllFilesView({
              
              <div className="flex items-center gap-2 text-sm text-muted-foreground px-2">
                 <span className="text-xs font-semibold uppercase tracking-wider">{t('all_files.sort_by')}</span>
-                <select 
-                  className="bg-transparent border-none text-foreground font-medium text-sm focus:outline-none cursor-pointer"
+                <Select 
+                  className="px-8 py-1.5 text-sm bg-transparent border-none w-auto"
+                  containerClassName="w-auto"
                   value={sortBy}
                   onChange={(e) => setSortBy(e.target.value as 'name' | 'count')}
                 >
                   <option value="name">{t('all_files.sort_name')}</option>
                   <option value="count">{t('all_files.sort_count')}</option>
-                </select>
+                </Select>
                 <button 
                   onClick={() => setSortOrder(prev => prev === 'asc' ? 'desc' : 'asc')}
                   className="p-1 hover:bg-background/50 rounded transition-colors"

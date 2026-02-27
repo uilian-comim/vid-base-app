@@ -319,11 +319,18 @@ export default function VideoPlayerView({ file, onClose, onPlayFile, onNavigate 
   const toggleFullscreen = useCallback(() => {
       if (!document.fullscreenElement) {
           containerRef.current?.requestFullscreen();
-          setIsFullscreen(true);
       } else {
           document.exitFullscreen();
-          setIsFullscreen(false);
       }
+  }, []);
+
+  useEffect(() => {
+      const handleFullscreenChange = () => {
+          setIsFullscreen(!!document.fullscreenElement);
+      };
+
+      document.addEventListener('fullscreenchange', handleFullscreenChange);
+      return () => document.removeEventListener('fullscreenchange', handleFullscreenChange);
   }, []);
 
   const handleMouseMove = useCallback(() => {
@@ -391,7 +398,10 @@ export default function VideoPlayerView({ file, onClose, onPlayFile, onNavigate 
         {/* Main Player Area */}
         <div className="p-8 pr-16 bg-black relative flex flex-col justify-center overflow-y-auto scrollbar-thin scrollbar-track-transparent scrollbar-thumb-white/10 hover:scrollbar-thumb-white/20">
           <div 
-            className="w-full aspect-video max-h-[80vh] rounded-2xl shadow-2xl border border-white/5 overflow-hidden relative flex items-center justify-center bg-black" 
+            className={cn(
+              "w-full overflow-hidden relative flex items-center justify-center bg-black",
+              isFullscreen ? "h-full rounded-none" : "aspect-video max-h-[80vh] rounded-2xl shadow-2xl border border-white/5"
+            )}
             ref={containerRef}
             onMouseMove={handleMouseMove}
             onMouseLeave={handleMouseLeave}

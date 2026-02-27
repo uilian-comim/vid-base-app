@@ -3,6 +3,7 @@ import { motion } from 'framer-motion';
 import { Palette, Sun, Moon } from 'lucide-react';
 import { useSettings, Theme, Language } from '../../contexts/SettingsContext';
 import { cn } from "@/lib/utils";
+import Select from '../Select';
 
 export default function AppearanceSettings() {
   const { t } = useTranslation();
@@ -74,22 +75,14 @@ export default function AppearanceSettings() {
 
       <div className="flex flex-col gap-3 bg-card/40 backdrop-blur-sm rounded-xl p-5 border border-border/40">
         <label className="text-sm font-medium text-foreground mb-1 block">{t('settings.language')}</label>
-        <div className="relative">
-          <select
-            className="w-full px-4 py-3 rounded-lg border border-border/50 bg-background/50 text-foreground focus:ring-2 focus:ring-primary/20 focus:border-primary transition-all outline-none appearance-none cursor-pointer hover:bg-background/80"
-            value={settings.language}
-            onChange={(e) => updateLanguage(e.target.value as Language)}
-          >
-            <option value="pt-BR">🇧🇷 {t('settings.portuguese')}</option>
-            <option value="en">🇺🇸 {t('settings.english')}</option>
-            <option value="es">🇪🇸 {t('settings.spanish')}</option>
-          </select>
-          <div className="absolute right-4 top-1/2 -translate-y-1/2 pointer-events-none text-muted-foreground">
-             <svg width="12" height="12" viewBox="0 0 12 12" fill="none" xmlns="http://www.w3.org/2000/svg">
-              <path d="M2.5 4.5L6 8L9.5 4.5" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round"/>
-            </svg>
-          </div>
-        </div>
+        <Select
+          value={settings.language}
+          onChange={(e) => updateLanguage(e.target.value as Language)}
+        >
+          <option value="pt-BR">🇧🇷 {t('settings.portuguese')}</option>
+          <option value="en">🇺🇸 {t('settings.english')}</option>
+          <option value="es">🇪🇸 {t('settings.spanish')}</option>
+        </Select>
       </div>
     </motion.section>
   );

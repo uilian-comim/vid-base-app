@@ -5,6 +5,7 @@ import { motion, AnimatePresence } from "framer-motion";
 import { SettingsProvider, useSettings } from "./contexts/SettingsContext";
 import { WatchHistoryProvider, useWatchHistory } from "./contexts/WatchHistoryContext";
 import { FilesProvider, useFiles, FileEntry } from "./contexts/FilesContext";
+import { ToastProvider } from "./contexts/ToastContext";
 import Sidebar from "./components/layout/Sidebar/Sidebar";
 import Titlebar from "./components/Titlebar";
 
@@ -285,13 +286,15 @@ function AppContent() {
 
 function App() {
   return (
-    <SettingsProvider>
-      <WatchHistoryProvider>
-        <FilesProvider>
-          <AppContent />
-        </FilesProvider>
-      </WatchHistoryProvider>
-    </SettingsProvider>
+    <ToastProvider>
+      <SettingsProvider>
+        <WatchHistoryProvider>
+          <FilesProvider>
+            <AppContent />
+          </FilesProvider>
+        </WatchHistoryProvider>
+      </SettingsProvider>
+    </ToastProvider>
   );
 }
 
