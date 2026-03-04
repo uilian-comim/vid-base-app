@@ -2,7 +2,8 @@ import { useRef, useEffect, useState, useCallback } from 'react';
 import { useTranslation } from 'react-i18next';
 import { motion } from 'framer-motion';
 import { X, Play, Check, List, Folder } from 'lucide-react';
-import { convertFileSrc } from '@tauri-apps/api/core';
+import { convertFileSrc, invoke } from '@tauri-apps/api/core';
+import { useToast } from '../contexts/ToastContext';
 import { FileEntry, useFiles } from '../contexts/FilesContext';
 import { useWatchHistory } from '../contexts/WatchHistoryContext';
 import { useSettings } from '../contexts/SettingsContext';
@@ -28,6 +29,7 @@ export default function VideoPlayerView({ file, onClose, onPlayFile, onNavigate 
   const { history, updateProgress, toggleWatchedStatus, checkWatchedStatus } = useWatchHistory();
   const { listDirectory } = useFiles();
   const { settings } = useSettings();
+  const { showToast } = useToast();
   
   const [siblings, setSiblings] = useState<FileEntry[]>([]);
   const [isLoadingSiblings, setIsLoadingSiblings] = useState(false);
@@ -241,8 +243,18 @@ export default function VideoPlayerView({ file, onClose, onPlayFile, onNavigate 
           playVideo();
       }
   }, [file.path, history]);
+  const lastToggleRef = useRef<number>(0);
 
-  const togglePlay = useCallback(() => {
+  const togglePlay = useCallback((e?: React.MouseEvent) => {
+    if (e && e.stopPropagation) {
+        e.stopPropagation();
+    }
+    
+    // Previne duplo clic e surtos de play() cancelados pelo pause() seguinte
+    const now = Date.now();
+    if (now - lastToggleRef.current < 250) return;
+    lastToggleRef.current = now;
+
     if (videoRef.current) {
         if (videoRef.current.paused) {
             const p = videoRef.current.play();
@@ -375,6 +387,41 @@ export default function VideoPlayerView({ file, onClose, onPlayFile, onNavigate 
           videoRef.current.playbackRate = rate;
           setPlaybackRate(rate);
       }
+  }, []);
+
+  // Discord Rich Presence Integration
+  useEffect(() => {
+    if (!settings.enableDiscordRichPresence) {
+      invoke('clear_discord_activity').catch(() => {});
+      return;
+    }
+
+    const updatePresence = async () => {
+      try {
+        const stateStr = isPlaying ? t('video.watching', 'Assistindo') : t('video.paused', 'Pausado');
+        const startTs = isPlaying 
+          ? Math.floor(Date.now() / 1000) - Math.floor(videoRef.current?.currentTime || 0)
+          : null;
+        
+        await invoke('set_discord_activity', {
+          activityState: stateStr,
+          details: file.name,
+          startTimestamp: startTs
+        });
+      } catch (error) {
+        console.error('Failed to update Discord presence:', error);
+        showToast(`Discord RPC Error: ${error}`, 'error');
+      }
+    };
+    
+    updatePresence();
+  }, [isPlaying, file.name, settings.enableDiscordRichPresence, t, showToast]);
+
+  useEffect(() => {
+    // Clear presence when component unmounts
+    return () => {
+      invoke('clear_discord_activity').catch(() => {});
+    };
   }, []);
 
   return (

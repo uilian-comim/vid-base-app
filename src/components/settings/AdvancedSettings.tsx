@@ -1,7 +1,7 @@
 import { useState } from 'react';
 import { useTranslation } from 'react-i18next';
 import { motion } from 'framer-motion';
-import { Wrench, RotateCcw, Trash2 } from 'lucide-react';
+import { Wrench, RotateCcw, Trash2, Gamepad2 } from 'lucide-react';
 import { invoke } from '@tauri-apps/api/core';
 import { useSettings } from '../../contexts/SettingsContext';
 import { useWatchHistory } from '../../contexts/WatchHistoryContext';
@@ -10,7 +10,7 @@ import ConfirmationModal from '../ConfirmationModal';
 
 export default function AdvancedSettings() {
   const { t } = useTranslation();
-  const { resetSettings } = useSettings();
+  const { settings, resetSettings, updateDiscordRichPresence } = useSettings();
   const { clearHistory } = useWatchHistory();
   const { showToast } = useToast();
 
@@ -111,6 +111,27 @@ export default function AdvancedSettings() {
           >
             {t('settings.clear_cache', 'Clear Video Cache')}
           </motion.button>
+        </div>
+
+        <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4 bg-indigo-500/5 border border-indigo-500/10 rounded-xl p-5 backdrop-blur-sm group hover:bg-indigo-500/10 transition-colors">
+          <div className="flex-1 pr-4">
+            <label className="text-base font-medium text-foreground mb-1 flex items-center gap-2">
+              <Gamepad2 size={16} className="text-indigo-500" />
+              {t('settings.discord_rpc', 'Discord Rich Presence')}
+            </label>
+            <p className="text-sm text-muted-foreground leading-relaxed">{t('settings.discord_rpc_desc', 'Show what you are currently watching on your Discord profile status.')}</p>
+          </div>
+          <div className="flex-shrink-0 flex items-center justify-end w-full sm:w-auto mt-2 sm:mt-0">
+            <label className="relative inline-flex items-center cursor-pointer">
+              <input 
+                type="checkbox" 
+                className="sr-only peer" 
+                checked={settings.enableDiscordRichPresence}
+                onChange={(e) => updateDiscordRichPresence(e.target.checked)}
+              />
+              <div className="w-11 h-6 bg-muted peer-focus:outline-none rounded-full peer peer-checked:after:translate-x-full peer-checked:after:border-white after:content-[''] after:absolute after:top-[2px] after:left-[2px] after:bg-white after:border-gray-300 after:border after:rounded-full after:h-5 after:w-5 after:transition-all peer-checked:bg-indigo-500"></div>
+            </label>
+          </div>
         </div>
 
         <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4 bg-destructive/5 border border-destructive/10 rounded-xl p-5 backdrop-blur-sm group hover:bg-destructive/10 transition-colors">

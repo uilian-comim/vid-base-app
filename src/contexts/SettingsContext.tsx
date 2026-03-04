@@ -32,6 +32,7 @@ interface AppSettings {
   directories: string[];
   groupByRoot: boolean;
   viewMode: 'grid' | 'list';
+  enableDiscordRichPresence: boolean;
 }
 
 const DEFAULT_SETTINGS: AppSettings = {
@@ -43,6 +44,7 @@ const DEFAULT_SETTINGS: AppSettings = {
   directories: [],
   groupByRoot: false,
   viewMode: 'grid',
+  enableDiscordRichPresence: true,
 };
 
 interface SettingsContextType {
@@ -58,6 +60,7 @@ interface SettingsContextType {
   removeDirectory: (path: string) => void;
   clearAllDirectories: () => void;
   resetSettings: () => Promise<void>;
+  updateDiscordRichPresence: (enabled: boolean) => void;
 }
 
 const SettingsContext = createContext<SettingsContextType | undefined>(undefined);
@@ -179,6 +182,10 @@ export function SettingsProvider({ children }: { children: ReactNode }) {
     setSettings(prev => ({ ...prev, viewMode: mode }));
   };
 
+  const updateDiscordRichPresence = (enabled: boolean) => {
+    setSettings(prev => ({ ...prev, enableDiscordRichPresence: enabled }));
+  };
+
   const addDirectory = (path: string) => {
     setSettings(prev => ({
       ...prev,
@@ -217,6 +224,7 @@ export function SettingsProvider({ children }: { children: ReactNode }) {
     removeDirectory,
     clearAllDirectories,
     resetSettings,
+    updateDiscordRichPresence,
   }), [settings]);
 
   return (

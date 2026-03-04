@@ -1,8 +1,9 @@
-import { useState, lazy, Suspense, useCallback } from "react";
+import { useState, lazy, Suspense, useCallback, useEffect } from "react";
 
 import { useTranslation } from 'react-i18next';
 import { motion, AnimatePresence } from "framer-motion";
 import { SettingsProvider, useSettings } from "./contexts/SettingsContext";
+import { invoke } from '@tauri-apps/api/core';
 import { WatchHistoryProvider, useWatchHistory } from "./contexts/WatchHistoryContext";
 import { FilesProvider, useFiles, FileEntry } from "./contexts/FilesContext";
 import { ToastProvider } from "./contexts/ToastContext";
@@ -38,8 +39,15 @@ function AppContent() {
   const [browserRoot, setBrowserRoot] = useState<string | null>(null); // New state to track the entry point
   const [fileTypeFilter, setFileTypeFilter] = useState<'video' | 'document' | null>(null);
   
-  useSettings();
+  const { settings } = useSettings();
   const { addToHistory, getLastWatched } = useWatchHistory();
+
+  // Global Discord RPC cleanup when the feature is disabled
+  useEffect(() => {
+    if (!settings.enableDiscordRichPresence) {
+      invoke('clear_discord_activity').catch(() => {});
+    }
+  }, [settings.enableDiscordRichPresence]);
 
 
   // Get last watched video
