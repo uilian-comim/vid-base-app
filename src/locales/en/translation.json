@@ -59,7 +59,9 @@
         "remove_dir": "Remove Directory",
         "portuguese": "Portuguese (Brasil)",
         "english": "English",
-        "spanish": "Spanish"
+        "spanish": "Spanish",
+        "discord_rpc": "Discord Rich Presence",
+        "discord_rpc_desc": "Show what you are currently watching on your Discord profile status."
     },
     "file_types": {
         "video": "Video",
@@ -82,7 +84,9 @@
         "quality": "Quality",
         "auto": "Auto",
         "playback_speed": "Playback Speed",
-        "normal": "Normal"
+        "normal": "Normal",
+        "watching": "Watching",
+        "paused": "Paused"
     },
     "common": {
         "items_one": "{{count}} item",
@@ -143,7 +147,8 @@
         "other_files": "Other Files",
         "files_in_folder": "Files in Folder",
         "documents": "documents",
-        "loading": "Loading..."
+        "loading": "Loading...",
+        "reading": "Reading"
     },
     "search_bar": {
         "placeholder_default": "Search files and folders..."

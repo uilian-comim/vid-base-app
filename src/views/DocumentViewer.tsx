@@ -4,8 +4,9 @@ import { motion } from 'framer-motion';
 import { 
   X, List, Folder, FileText
 } from 'lucide-react';
-import { convertFileSrc } from '@tauri-apps/api/core';
+import { convertFileSrc, invoke } from '@tauri-apps/api/core';
 import { FileEntry, useFiles } from '../contexts/FilesContext';
+import { useSettings } from '../contexts/SettingsContext';
 import { cn } from "@/lib/utils";
 
 interface DocumentViewerProps {
@@ -18,10 +19,40 @@ interface DocumentViewerProps {
 export default function DocumentViewer({ file, onClose, onOpenFile, onNavigate }: DocumentViewerProps) {
   const { t } = useTranslation();
   const { listDirectory } = useFiles();
+  const { settings } = useSettings();
   
   const [siblings, setSiblings] = useState<FileEntry[]>([]);
   const [isLoadingSiblings, setIsLoadingSiblings] = useState(false);
   const [showSidebar, setShowSidebar] = useState(true);
+
+  // Discord Rich Presence Integration
+  useEffect(() => {
+    if (!settings.enableDiscordRichPresence) {
+      invoke('clear_discord_activity').catch(() => {});
+      return;
+    }
+
+    const updatePresence = async () => {
+      try {
+        await invoke('set_discord_activity', {
+          activityState: t('document_viewer.reading', 'Lendo'),
+          details: file.name,
+          startTimestamp: Math.floor(Date.now() / 1000)
+        });
+      } catch (error) {
+        console.error('Failed to update Discord presence for document:', error);
+      }
+    };
+    
+    updatePresence();
+  }, [file.name, settings.enableDiscordRichPresence, t]);
+
+  useEffect(() => {
+    // Clear presence when component unmounts
+    return () => {
+      invoke('clear_discord_activity').catch(() => {});
+    };
+  }, []);
 
   // Load Siblings (Other documents in same folder)
   useEffect(() => {

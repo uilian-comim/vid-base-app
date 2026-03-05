@@ -99,17 +99,13 @@ pub fn clear_discord_activity(app_handle: AppHandle) -> Result<(), String> {
     std::thread::spawn(move || {
         let state = app_handle.state::<DiscordState>();
 
-        // Lock, take the client, and immediately unlock
-        // By taking it, the old client will go out of scope at the end of this thread and gracefully disconnect.
-        let client_opt = {
-            let mut guard = state.client.lock().unwrap();
-            guard.take()
-        };
-
-        if let Some(mut client) = client_opt {
+        let mut guard = state.client.lock().unwrap();
+        if let Some(client) = guard.as_mut() {
             println!("Clearing Discord activity...");
             let _ = client.clear_activity();
-            println!("Discord client instance dropped and connection closed.");
+            println!("Discord activity cleared.");
+        } else {
+            println!("No Discord client found. Nothing to clear.");
         }
     });
 
