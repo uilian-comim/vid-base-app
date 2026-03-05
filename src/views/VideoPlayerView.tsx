@@ -2,15 +2,16 @@ import { useRef, useEffect, useState, useCallback } from 'react';
 import { useTranslation } from 'react-i18next';
 import { motion } from 'framer-motion';
 import { X, Play, Check, List, Folder } from 'lucide-react';
-import { convertFileSrc, invoke } from '@tauri-apps/api/core';
-import { useToast } from '../contexts/ToastContext';
-import { FileEntry, useFiles } from '../contexts/FilesContext';
+import { convertFileSrc } from '@tauri-apps/api/core';
+import { FileEntry } from '../contexts/FilesContext';
 import { useWatchHistory } from '../contexts/WatchHistoryContext';
 import { useSettings } from '../contexts/SettingsContext';
 import { cn } from "@/lib/utils";
 import VideoControls from '../components/player/VideoControls';
 import EpisodesList from '../components/player/EpisodesList';
 import { useVideoShortcuts } from '../hooks/useVideoShortcuts';
+import { useDiscordRPC } from '../hooks/useDiscordRPC';
+import { useFolderSiblings } from '../hooks/useFolderSiblings';
 
 interface VideoPlayerViewProps {
   file: FileEntry;
@@ -27,12 +28,9 @@ export default function VideoPlayerView({ file, onClose, onPlayFile, onNavigate 
   const controlsTimeoutRef = useRef<number | null>(null);
   
   const { history, updateProgress, toggleWatchedStatus, checkWatchedStatus } = useWatchHistory();
-  const { listDirectory } = useFiles();
   const { settings } = useSettings();
-  const { showToast } = useToast();
   
-  const [siblings, setSiblings] = useState<FileEntry[]>([]);
-  const [isLoadingSiblings, setIsLoadingSiblings] = useState(false);
+  const { siblings, isLoadingSiblings } = useFolderSiblings(file.path, 'video');
   
   const isWatched = checkWatchedStatus(file.path);
 
@@ -63,40 +61,7 @@ export default function VideoPlayerView({ file, onClose, onPlayFile, onNavigate 
   const currentDurationRef = useRef(0);
   const lastKnownTimeRef = useRef(initialOffset);
 
-  // Stabilize listDirectory to prevent effect loops
-  const listDirectoryRef = useRef(listDirectory);
-  useEffect(() => {
-      listDirectoryRef.current = listDirectory;
-  }, [listDirectory]);
-
-  // Load Siblings (Episodes)
-  useEffect(() => {
-    async function loadSiblings() {
-        setIsLoadingSiblings(true);
-        try {
-            const separator = file.path.includes('/') ? '/' : '\\';
-            const parts = file.path.split(separator);
-            parts.pop();
-            const parentPath = parts.join(separator);
-
-            const entries = await listDirectoryRef.current(parentPath);
-            const videoSiblings: FileEntry[] = entries
-                .filter(entry => entry.type === 'video')
-                .map(entry => ({
-                    name: entry.name,
-                    path: entry.path,
-                    file_type: 'video'
-                }));
-            
-            setSiblings(videoSiblings);
-        } catch (error) {
-            console.error("Failed to load siblings:", error);
-        } finally {
-            setIsLoadingSiblings(false);
-        }
-    }
-    loadSiblings();
-  }, [file.path]); // Removed listDirectory from deps
+  // Stabilized streamable handling
 
   const isStreamableFormat = (path: string) => {
       const lower = path.toLowerCase();
@@ -390,39 +355,15 @@ export default function VideoPlayerView({ file, onClose, onPlayFile, onNavigate 
   }, []);
 
   // Discord Rich Presence Integration
-  useEffect(() => {
-    if (!settings.enableDiscordRichPresence) {
-      invoke('clear_discord_activity').catch(() => {});
-      return;
-    }
+  const startTs = isPlaying && videoRef.current 
+    ? Math.floor(Date.now() / 1000) - Math.floor(videoRef.current.currentTime)
+    : undefined;
 
-    const updatePresence = async () => {
-      try {
-        const stateStr = isPlaying ? t('video.watching', 'Assistindo') : t('video.paused', 'Pausado');
-        const startTs = isPlaying 
-          ? Math.floor(Date.now() / 1000) - Math.floor(videoRef.current?.currentTime || 0)
-          : null;
-        
-        await invoke('set_discord_activity', {
-          activityState: stateStr,
-          details: file.name,
-          startTimestamp: startTs
-        });
-      } catch (error) {
-        console.error('Failed to update Discord presence:', error);
-        showToast(`Discord RPC Error: ${error}`, 'error');
-      }
-    };
-    
-    updatePresence();
-  }, [isPlaying, file.name, settings.enableDiscordRichPresence, t, showToast]);
-
-  useEffect(() => {
-    // Clear presence when component unmounts
-    return () => {
-      invoke('clear_discord_activity').catch(() => {});
-    };
-  }, []);
+  useDiscordRPC({
+    activityState: isPlaying ? t('video.watching', 'Assistindo') : t('video.paused', 'Pausado'),
+    details: file.name,
+    startTimestamp: startTs
+  });
 
   return (
     <motion.div 

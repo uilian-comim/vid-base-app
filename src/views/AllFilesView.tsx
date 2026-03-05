@@ -7,6 +7,7 @@ import SearchBar from '../components/SearchBar';
 import { Plus, LayoutGrid, List, ArrowUpAZ, ArrowDownAZ, Folder, ChevronRight, Layers } from 'lucide-react';
 import { useSettings } from '../contexts/SettingsContext';
 import Select from '../components/Select';
+import { useGroupedFiles } from '../hooks/useGroupedFiles';
 
 interface AllFilesViewProps {
   files: FileEntry[];
@@ -37,47 +38,8 @@ export default function AllFilesView({
     return () => clearTimeout(timer);
   }, [searchQuery]);
   
-  // Group files by directory - Memozied to prevent recalculation on every render
-  const directories = useMemo(() => {
-    if (settings.groupByRoot && settings.directories.length > 0) {
-      // Group by Root Directory
-      const rootMap = new Map<string, { name: string, count: number, fileType: string }>();
-
-      files.forEach(file => {
-        // Find which root directory this file belongs to
-        const rootDir = settings.directories.find(dir => file.path.startsWith(dir));
-        
-        if (rootDir) {
-           const rootName = rootDir.split(/[\\/]/).pop() || rootDir;
-           if (!rootMap.has(rootDir)) {
-             rootMap.set(rootDir, { name: rootName, count: 0, fileType: file.file_type });
-           }
-           rootMap.get(rootDir)!.count++;
-        }
-      });
-      
-      return Array.from(rootMap.entries())
-        .sort((a, b) => a[0].localeCompare(b[0], undefined, { numeric: true, sensitivity: 'base' }));
-
-    } else {
-      // Original grouping logic (Parent Directory)
-      return Object.entries(
-        files.reduce((acc, file) => {
-          const separator = file.path.includes('/') ? '/' : '\\';
-          const parts = file.path.split(separator);
-          parts.pop(); // Remove filename
-          const parentPath = parts.join(separator);
-          const folderName = parts.pop() || parentPath;
-          
-          if (!acc[parentPath]) {
-            acc[parentPath] = { name: folderName, count: 0, fileType: file.file_type };
-          }
-          acc[parentPath].count++;
-          return acc;
-        }, {} as Record<string, { name: string, count: number, fileType: string }>)
-      ).sort((a, b) => a[0].localeCompare(b[0], undefined, { numeric: true, sensitivity: 'base' }));
-    }
-  }, [files, settings.groupByRoot, settings.directories]);
+  // Group files using custom hook to keep this component clean
+  const directories = useGroupedFiles(files, settings.groupByRoot, settings.directories);
 
   // Filter directories based on search - Memoized
   const filteredDirectories = useMemo(() => {
