@@ -2,9 +2,9 @@ import React, { createContext, useContext, useState, useCallback, ReactNode } fr
 import { motion, AnimatePresence } from 'framer-motion';
 import { CheckCircle2, AlertCircle, Info, X } from 'lucide-react';
 
-export type ToastType = 'success' | 'error' | 'info';
+type ToastType = 'success' | 'error' | 'info';
 
-export interface ToastMessage {
+interface ToastMessage {
   id: string;
   message: string;
   type: ToastType;

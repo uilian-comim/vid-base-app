@@ -42,7 +42,6 @@ pub fn set_discord_activity(
         let mut attempts = 0;
         loop {
             let mut success = false;
-            let mut should_retry = false;
 
             {
                 let mut guard = state.client.lock().unwrap();
@@ -65,7 +64,7 @@ pub fn set_discord_activity(
                         Err(e) => {
                             let err_str = format!("{:?}", e);
                             if err_str.contains("NotStarted") {
-                                should_retry = true;
+                                // Will retry automatically
                             } else {
                                 println!("Failed to set Discord activity unrecoverably: {:?}", e);
                                 success = true; // Break loop on other errors

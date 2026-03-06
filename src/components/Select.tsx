@@ -3,7 +3,7 @@ import { cn } from '../lib/utils';
 import { ChevronDown, Check } from 'lucide-react';
 import { motion, AnimatePresence } from 'framer-motion';
 
-export interface SelectProps {
+interface SelectProps {
   value?: string;
   onChange?: (e: { target: { value: string } }) => void;
   className?: string;
