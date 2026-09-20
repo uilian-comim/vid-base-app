@@ -45,7 +45,7 @@
   },
   "plugins": {
     "updater": {
-      "pubkey": "dW50cnVzdGVkIGNvbW1lbnQ6IG1pbmlzaWduIHB1YmxpYyBrZXk6IEU3NzhBRkEyMTRGODY1MjkKUldRcFpmZ1VvcTk0NXlBaFdzcHBxOEVlMjIzdm52VkJJSVBtNHNodXNRK3dmL1JSYWdXcDZBdjEK",
+      "pubkey": "dW50cnVzdGVkIGNvbW1lbnQ6IG1pbmlzaWduIHB1YmxpYyBrZXk6IEIxRTI3NjNGMUI3N0Q5NTEKUldSUjJYY2JQM2Jpc1pqS3ZKUjEvNXp2bVpHaE9JeTc3M1dFdFkwN1ZJa3k5ZVZSNTBLeS9WTzcK",
       "endpoints": [
         "https://github.com/uilian-comim/vid-base-app/releases/latest/download/latest.json"
       ]
