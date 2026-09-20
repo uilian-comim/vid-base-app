@@ -42,6 +42,29 @@ fn window_close(window: tauri::Window) {
     let _ = window.close();
 }
 
+#[tauri::command]
+fn restart_app(app: tauri::AppHandle) {
+    #[cfg(target_os = "macos")]
+    {
+        // Relaunching the executable directly is unreliable after an in-place update
+        // on macOS, so reopen the .app bundle through `open` once this process exits.
+        if let Some(bundle) = std::env::current_exe().ok().and_then(|exe| {
+            exe.ancestors()
+                .find(|p| p.extension().map_or(false, |e| e == "app"))
+                .map(|p| p.to_path_buf())
+        }) {
+            let _ = std::process::Command::new("sh")
+                .arg("-c")
+                .arg("sleep 1; open -n \"$0\"")
+                .arg(bundle)
+                .spawn();
+            app.exit(0);
+            return;
+        }
+    }
+    app.restart();
+}
+
 #[cfg_attr(mobile, tauri::mobile_entry_point)]
 pub fn run() {
     volume_mixer::init();
@@ -74,6 +97,7 @@ pub fn run() {
             window_minimize,
             window_toggle_maximize,
             window_close,
+            restart_app,
             discord_rpc::set_discord_activity,   // <-- NEW
             discord_rpc::clear_discord_activity  // <-- NEW
         ])

@@ -4,7 +4,7 @@ import { motion } from 'framer-motion';
 import { Download } from 'lucide-react';
 import { getVersion } from '@tauri-apps/api/app';
 import { check, Update } from '@tauri-apps/plugin-updater';
-import { relaunch } from '@tauri-apps/plugin-process';
+import { invoke } from '@tauri-apps/api/core';
 import { useToast } from '../../contexts/ToastContext';
 
 type Status = 'idle' | 'checking' | 'available' | 'downloading';
@@ -53,7 +53,7 @@ export default function UpdateSettings() {
           if (total > 0) setProgress(Math.round((downloaded / total) * 100));
         }
       });
-      await relaunch();
+      await invoke('restart_app');
     } catch (error) {
       console.error(error);
       setStatus('available');
