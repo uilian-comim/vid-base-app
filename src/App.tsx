@@ -9,6 +9,7 @@ import { FilesProvider, useFiles, FileEntry } from "./contexts/FilesContext";
 import { ToastProvider } from "./contexts/ToastContext";
 import Sidebar from "./components/layout/Sidebar/Sidebar";
 import Titlebar from "./components/Titlebar";
+import CommandPalette from "./components/CommandPalette";
 
 // Lazy Loaded Views
 const Settings = lazy(() => import("./views/SettingsView"));
@@ -22,7 +23,7 @@ const HomeView = lazy(() => import("./views/HomeView"));
 // Loading Fallback
 const ViewLoader = () => (
   <div className="w-full h-full flex items-center justify-center">
-    <div className="w-12 h-12 border-4 border-primary/20 border-t-primary rounded-full animate-spin" />
+    <div className="w-9 h-9 border-[3px] border-primary/20 border-t-primary rounded-full animate-spin" />
   </div>
 );
 
@@ -38,6 +39,7 @@ function AppContent() {
   const [browserPath, setBrowserPath] = useState<string | null>(null);
   const [browserRoot, setBrowserRoot] = useState<string | null>(null); // New state to track the entry point
   const [fileTypeFilter, setFileTypeFilter] = useState<'video' | 'document' | null>(null);
+  const [paletteOpen, setPaletteOpen] = useState(false);
   
   const { settings } = useSettings();
   const { addToHistory, getLastWatched } = useWatchHistory();
@@ -49,6 +51,18 @@ function AppContent() {
     }
   }, [settings.enableDiscordRichPresence]);
 
+
+  // Global Cmd/Ctrl+K opens the command palette
+  useEffect(() => {
+    const onKey = (e: KeyboardEvent) => {
+      if ((e.metaKey || e.ctrlKey) && e.key.toLowerCase() === 'k') {
+        e.preventDefault();
+        setPaletteOpen((o) => !o);
+      }
+    };
+    window.addEventListener('keydown', onKey);
+    return () => window.removeEventListener('keydown', onKey);
+  }, []);
 
   // Get last watched video
   const lastWatched = getLastWatched();
@@ -146,8 +160,26 @@ function AppContent() {
 
 
 
-  // Get recent files (last 3)
-  const recentFiles = files.slice(0, 3);
+  const paletteNav = useCallback((target: 'inicio' | 'continuar' | 'arquivos' | 'video' | 'document' | 'settings') => {
+    closePlayer();
+    if (target === 'settings') {
+      setActiveNav('configuracoes');
+      setShowSettings(true);
+      return;
+    }
+    setShowSettings(false);
+    setBrowserPath('');
+    if (target === 'video' || target === 'document') {
+      setFileTypeFilter(target);
+      setActiveNav('arquivos');
+    } else {
+      setFileTypeFilter(null);
+      setActiveNav(target);
+    }
+  }, [closePlayer]);
+
+  // Get recent files (last 6)
+  const recentFiles = files.slice(0, 6);
 
   // Count files by type
   const videoCount = files.filter(f => f.file_type === "video").length;
@@ -162,7 +194,7 @@ function AppContent() {
   const isPlayingVideo = playingFile && playingFile.file_type === 'video';
 
   return (
-    <div className="flex flex-col h-screen w-screen bg-background text-foreground overflow-hidden">
+    <div className="flex flex-col h-screen w-screen bg-sidebar text-foreground overflow-hidden">
       <Titlebar />
       <div className="flex flex-1 h-full w-full overflow-hidden relative">
         {/* Sidebar - Hide if playing video */}
@@ -181,12 +213,13 @@ function AppContent() {
           directories={directories}
           filesCount={files.length}
           navigateToDirectory={navigateToDirectory}
+          onOpenSearch={() => setPaletteOpen(true)}
         />
       )}
 
       {/* Main Content - Hide if playing video */}
       {!isPlayingVideo && (
-      <main className="flex-1 overflow-y-auto overflow-x-hidden bg-background relative">
+      <main className="flex-1 overflow-y-auto overflow-x-hidden bg-background relative rounded-tl-[20px] border-t border-l border-foreground/10 shadow-[0_0_40px_-10px_hsl(var(--shadow-color)/0.4)]">
         <Suspense fallback={<ViewLoader />}>
           <AnimatePresence mode="wait">
           {showSettings ? (
@@ -288,6 +321,15 @@ function AppContent() {
         </AnimatePresence>
       </Suspense>
       </div>
+      <CommandPalette
+        open={paletteOpen}
+        onClose={() => setPaletteOpen(false)}
+        files={files}
+        directories={directories}
+        onOpenFile={openFile}
+        onOpenDirectory={navigateToDirectory}
+        onNav={paletteNav}
+      />
     </div>
   );
 }

@@ -1,10 +1,9 @@
 import { memo } from 'react';
 import { motion } from 'framer-motion';
 import { useTranslation } from 'react-i18next';
-import { FileVideo, FileText, Clock, CheckCircle } from 'lucide-react';
+import { Film, FileText, Clock, Check, Play } from 'lucide-react';
 import PathTooltip from './PathTooltip';
 import { FileEntry } from '../contexts/FilesContext';
-// import './FileCard.css';
 import { cn } from "@/lib/utils";
 
 interface FileCardProps {
@@ -16,89 +15,58 @@ interface FileCardProps {
   completed?: boolean;
 }
 
-export default memo(function FileCard({ 
-  file, 
-  onClick, 
-  index = 0,
-  progress,
-  lastWatched,
-  completed
-}: FileCardProps) {
+export default memo(function FileCard({ file, onClick, index = 0, progress, lastWatched, completed }: FileCardProps) {
   const { t } = useTranslation();
-  const Icon = file.file_type === 'video' ? FileVideo : FileText;
-  
+  const isVideo = file.file_type === 'video';
+  const Icon = isVideo ? Film : FileText;
+
   return (
     <motion.div
-      className={cn(
-        "relative bg-white rounded-xl p-6 cursor-pointer shadow-sm flex gap-4 items-start overflow-hidden transition-all duration-250 hover:shadow-lg dark:bg-card dark:shadow-md dark:hover:shadow-xl hover:bg-accent/50 dark:hover:bg-accent/10",
-        "before:absolute before:inset-x-0 before:top-0 before:h-[3px] before:bg-gradient-to-r before:from-primary before:to-[#667eea] before:opacity-0 before:transition-opacity before:duration-250 hover:before:opacity-100"
-      )}
+      role="button"
+      tabIndex={0}
+      onKeyDown={(e) => (e.key === 'Enter' || e.key === ' ') && onClick()}
+      className="surface surface-hover group relative flex cursor-pointer items-center gap-4 overflow-hidden rounded-2xl p-4"
       onClick={onClick}
-      initial={{ opacity: 0, y: 20 }}
+      initial={{ opacity: 0, y: 14 }}
       animate={{ opacity: 1, y: 0 }}
-      transition={{ 
-        duration: 0.3,
-        delay: index * 0.05,
-        type: "spring",
-        stiffness: 260,
-        damping: 20
-      }}
-      whileHover={{ 
-        scale: 1.02,
-        y: -4,
-        transition: { duration: 0.2 }
-      }}
-      whileTap={{ scale: 0.98 }}
+      transition={{ duration: 0.3, delay: Math.min(index, 12) * 0.03, ease: [0.2, 0.8, 0.2, 1] }}
+      whileTap={{ scale: 0.985 }}
     >
-      <div className="relative shrink-0">
-        <motion.div 
-          className={cn(
-            "w-12 h-12 rounded-lg flex items-center justify-center bg-primary/10 text-primary",
-            file.file_type === 'video' && "bg-blue-50 text-blue-600 dark:bg-blue-900/20 dark:text-blue-400",
-            file.file_type === 'document' && "bg-orange-50 text-orange-600 dark:bg-orange-900/20 dark:text-orange-400"
-          )}
-          whileHover={{ scale: 1.1 }}
-          transition={{ type: "spring", stiffness: 400 }}
-        >
-          <Icon size={24} />
-        </motion.div>
+      <div
+        className={cn(
+          "relative flex h-14 w-14 shrink-0 items-center justify-center rounded-xl text-white shadow-md transition-transform duration-300 group-hover:scale-105",
+          isVideo ? "bg-gradient-to-br from-indigo-500 to-fuchsia-500 shadow-indigo-500/30" : "bg-gradient-to-br from-amber-400 to-orange-500 shadow-orange-500/30"
+        )}
+      >
+        <Icon size={24} className="transition-opacity group-hover:opacity-0" />
+        {isVideo && <Play size={22} className="absolute fill-white opacity-0 transition-opacity group-hover:opacity-100" />}
         {completed && (
-          <motion.div 
-            className="absolute -top-1 -right-1 w-5 h-5 rounded-full bg-green-500 text-white flex items-center justify-center shadow-sm"
-            initial={{ scale: 0 }}
-            animate={{ scale: 1 }}
-            transition={{ type: "spring", delay: 0.2 }}
-          >
-            <CheckCircle size={16} />
-          </motion.div>
+          <span className="absolute -right-1.5 -top-1.5 flex h-5 w-5 items-center justify-center rounded-full bg-emerald-500 ring-2 ring-card">
+            <Check size={12} strokeWidth={3} />
+          </span>
         )}
       </div>
 
-      <div className="flex-1 min-w-0 flex flex-col gap-1">
-        <h4 className="text-base font-semibold text-foreground m-0 overflow-hidden text-ellipsis whitespace-nowrap leading-tight">{file.name}</h4>
-        <p className="text-sm text-muted-foreground m-0">
-          {file.file_type === 'video' ? t('file_card.video') : t('file_card.document')}
-        </p>
-
-        <div className="mt-1">
-          <PathTooltip path={file.path} />
+      <div className="flex min-w-0 flex-1 flex-col gap-1">
+        <h4 className="line-clamp-2 break-words text-[14px] font-semibold leading-snug">{file.name}</h4>
+        <div className="flex items-center gap-2 text-xs text-muted-foreground">
+          <span className="rounded-md bg-foreground/[0.06] px-1.5 py-0.5 font-medium">
+            {isVideo ? t('file_card.video') : t('file_card.document')}
+          </span>
+          {lastWatched && (
+            <span className="flex items-center gap-1"><Clock size={11} />{lastWatched}</span>
+          )}
         </div>
-        
-        {lastWatched && (
-          <div className="flex items-center gap-1 text-sm text-muted-foreground">
-            <Clock size={12} />
-            <span>{lastWatched}</span>
-          </div>
-        )}
+        <div className="opacity-70"><PathTooltip path={file.path} /></div>
       </div>
 
       {progress !== undefined && progress > 0 && (
-        <div className="absolute bottom-0 left-0 right-0 h-1 bg-border overflow-hidden">
-          <motion.div 
-            className="h-full bg-gradient-to-r from-primary to-[#667eea] rounded-tr-sm"
+        <div className="absolute inset-x-0 bottom-0 h-[3px] bg-foreground/10">
+          <motion.div
+            className="brand-bg h-full rounded-r-full"
             initial={{ width: 0 }}
-            animate={{ width: `${progress}%` }}
-            transition={{ duration: 0.5, delay: 0.2 }}
+            animate={{ width: `${Math.min(progress, 100)}%` }}
+            transition={{ duration: 0.6, delay: 0.15 }}
           />
         </div>
       )}

@@ -26,7 +26,7 @@ interface FilesContextType {
 
 const FilesContext = createContext<FilesContextType | undefined>(undefined);
 
-const VIDEO_EXTENSIONS = ['.mp4', '.mkv', '.ts', '.avi', '.mov', '.wmv', '.flv', '.webm'];
+const VIDEO_EXTENSIONS = ['.mp4', '.m4v', '.mpeg4', '.mkv', '.ts', '.avi', '.mov', '.wmv', '.flv', '.webm'];
 const DOCUMENT_EXTENSIONS = ['.pdf', '.html'];
 
 const DIRECTORY_COLORS: Array<"blue" | "purple" | "green" | "orange"> = ["blue", "purple", "green", "orange"];

@@ -180,5 +180,27 @@
     },
     "thumbnail": {
         "alt": "Miniatura"
+    },
+    "palette": {
+        "greet_morning": "Bom dia",
+        "greet_afternoon": "Boa tarde",
+        "greet_evening": "Boa noite",
+        "tagline": "O que vamos assistir hoje?",
+        "search_placeholder": "Buscar arquivos, pastas e ações…",
+        "no_results": "Nada encontrado",
+        "go_to": "Ir para",
+        "actions": "Ações",
+        "files": "Arquivos",
+        "folders": "Pastas",
+        "open": "Abrir",
+        "resume": "Retomar",
+        "search": "Buscar",
+        "pick_up": "Continue de onde parou",
+        "add_folder": "Adicionar pasta",
+        "your_folders": "Suas pastas",
+        "hint_navigate": "navegar",
+        "hint_open": "abrir",
+        "hint_close": "fechar",
+        "left": "restantes"
     }
 }

@@ -38,13 +38,35 @@ struct ThumbnailParams {
 
 struct AppState {
     ffmpeg_path: String,
+    ffprobe_path: String,
+}
+
+/// Resolves a binary by name. Apps launched from Finder/Dock on macOS don't inherit the
+/// shell PATH, so Homebrew/MacPorts locations must be probed explicitly.
+fn resolve_binary(name: &str) -> String {
+    #[cfg(target_os = "macos")]
+    {
+        let candidates = [
+            "/opt/homebrew/bin",
+            "/usr/local/bin",
+            "/opt/local/bin",
+            "/usr/bin",
+        ];
+        for dir in candidates {
+            let p = std::path::Path::new(dir).join(name);
+            if p.is_file() {
+                return p.to_string_lossy().to_string();
+            }
+        }
+    }
+    name.to_string()
 }
 
 async fn get_video_info(
-    State(_state): State<Arc<AppState>>,
+    State(state): State<Arc<AppState>>,
     Query(params): Query<StreamParams>,
 ) -> impl IntoResponse {
-    let output = Command::new("ffprobe")
+    let output = Command::new(&state.ffprobe_path)
         .arg("-v")
         .arg("error")
         .arg("-show_entries")
@@ -88,7 +110,8 @@ async fn stream_fmp4(
         .arg("mp4")
         .arg("pipe:1")
         .stdout(Stdio::piped())
-        .stderr(Stdio::null());
+        .stderr(Stdio::null())
+        .kill_on_drop(true);
 
     match cmd.spawn() {
         Ok(mut child) => {
@@ -146,7 +169,8 @@ async fn get_thumbnail(
         .arg("1")
         .arg("pipe:1")
         .stdout(Stdio::piped())
-        .stderr(Stdio::null());
+        .stderr(Stdio::null())
+        .kill_on_drop(true);
 
     match cmd.spawn() {
         Ok(mut child) => {
@@ -176,7 +200,8 @@ async fn get_thumbnail(
 
 pub async fn start_server() {
     let state = Arc::new(AppState {
-        ffmpeg_path: "ffmpeg".to_string(),
+        ffmpeg_path: resolve_binary("ffmpeg"),
+        ffprobe_path: resolve_binary("ffprobe"),
     });
 
     let cors = CorsLayer::new()
@@ -196,6 +221,14 @@ pub async fn start_server() {
     let addr = SocketAddr::from(([127, 0, 0, 1], 8765));
     println!("Starting local video stream server at http://{}", addr);
 
-    let listener = tokio::net::TcpListener::bind(&addr).await.unwrap();
-    axum::serve(listener, app).await.unwrap();
+    let listener = match tokio::net::TcpListener::bind(&addr).await {
+        Ok(l) => l,
+        Err(e) => {
+            eprintln!("Failed to bind stream server on {}: {}", addr, e);
+            return;
+        }
+    };
+    if let Err(e) = axum::serve(listener, app).await {
+        eprintln!("Stream server error: {}", e);
+    }
 }

@@ -72,7 +72,7 @@ export default function VideoControls({
     <AnimatePresence>
       {show && (
         <motion.div 
-          className="absolute bottom-0 left-0 right-0 p-6 pt-24 bg-gradient-to-t from-black via-black/60 to-transparent flex flex-col gap-2 z-10"
+          className="absolute bottom-0 left-0 right-0 px-8 pb-6 pt-28 bg-gradient-to-t from-black/95 via-black/50 to-transparent flex flex-col gap-2 z-10"
           initial={{ opacity: 0, y: 10 }}
           animate={{ opacity: 1, y: 0 }}
           exit={{ opacity: 0, y: 10 }}
@@ -82,14 +82,14 @@ export default function VideoControls({
         >
           {/* Progress Bar */}
           <div 
-            className="relative w-full h-1.5 bg-white/20 rounded-full cursor-pointer group mb-2 hover:h-2 transition-all"
+            className="relative w-full h-1 bg-white/25 rounded-full cursor-pointer group mb-3 hover:h-1.5 transition-all"
             onMouseMove={handleProgressMouseMove}
             onMouseLeave={handleProgressMouseLeave}
 
           >
             {previewTime !== null && (
               <div 
-                className="absolute bottom-8 -translate-x-1/2 bg-zinc-900 border border-white/10 rounded-xl p-1 flex flex-col items-center pointer-events-none z-20 shadow-2xl overflow-hidden min-w-[160px]"
+                className="absolute bottom-8 -translate-x-1/2 bg-zinc-900/90 backdrop-blur-xl border border-white/10 rounded-xl p-1 flex flex-col items-center pointer-events-none z-20 shadow-2xl overflow-hidden min-w-[160px]"
                 style={{ left: previewLeft }}
               >
                 {!isStreamableFormat ? (
@@ -112,17 +112,14 @@ export default function VideoControls({
                     />
                   </div>
                 )}
-                <span className="w-full text-center py-2 text-base font-bold text-white font-sans tracking-wide drop-shadow-md">{formatTime(previewTime)}</span>
+                <span className="w-full text-center py-2 text-sm font-semibold text-white tabular-nums">{formatTime(previewTime)}</span>
               </div>
             )}
             <div 
-              className="h-full rounded-full bg-primary relative w-full"
-              style={{
-                width: `${(currentTime / (duration || 1)) * 100}%`,
-                background: `linear-gradient(to right, #6366f1 0%, #6366f1 100%)`
-              }}
+              className="brand-bg h-full rounded-full relative"
+              style={{ width: `${(currentTime / (duration || 1)) * 100}%` }}
             >
-              <div className="absolute right-0 top-1/2 -translate-y-1/2 w-3 h-3 bg-primary rounded-full opacity-0 group-hover:opacity-100 transition-opacity scale-0 group-hover:scale-125 shadow-lg ring-2 ring-white/20" />
+              <div className="absolute right-0 top-1/2 -translate-y-1/2 w-3.5 h-3.5 bg-white rounded-full opacity-0 group-hover:opacity-100 transition-opacity scale-0 group-hover:scale-125 shadow-lg ring-2 ring-white/20" />
             </div>
             
             <input 
@@ -137,21 +134,21 @@ export default function VideoControls({
 
           <div className="flex justify-between items-center">
             <div className="flex items-center gap-4">
-              <button className="p-2 rounded-full hover:bg-white/20 text-white transition-all transform hover:scale-110" onClick={togglePlay}>
-                {isPlaying ? <Pause size={24} fill="white" /> : <Play size={24} fill="white" />}
+              <button className="flex h-11 w-11 items-center justify-center rounded-full bg-white text-black shadow-lg transition-transform hover:scale-105 active:scale-95" onClick={togglePlay}>
+                {isPlaying ? <Pause size={20} fill="black" /> : <Play size={20} fill="black" className="ml-0.5" />}
               </button>
               
               <div className="flex items-center gap-2">
-                <button className="p-2 rounded-full hover:bg-white/20 text-white transition-all transform hover:scale-110" onClick={() => skip(-settings.videoSkipBackward)}>
+                <button className="p-2 rounded-full hover:bg-white/15 text-white/90 hover:text-white transition-all active:scale-90" onClick={() => skip(-settings.videoSkipBackward)}>
                   <SkipBack size={20} />
                 </button>
-                <button className="p-2 rounded-full hover:bg-white/20 text-white transition-all transform hover:scale-110" onClick={() => skip(settings.videoSkipForward)}>
+                <button className="p-2 rounded-full hover:bg-white/15 text-white/90 hover:text-white transition-all active:scale-90" onClick={() => skip(settings.videoSkipForward)}>
                   <SkipForward size={20} />
                 </button>
               </div>
 
               <div className="flex items-center gap-2 group/volume relative">
-                <button className="p-2 rounded-full hover:bg-white/20 text-white transition-all transform hover:scale-110" onClick={toggleMute}>
+                <button className="p-2 rounded-full hover:bg-white/15 text-white/90 hover:text-white transition-all active:scale-90" onClick={toggleMute}>
                   {isMuted || volume === 0 ? <VolumeX size={20} /> : <Volume2 size={20} />}
                 </button>
                 <input 
@@ -168,7 +165,7 @@ export default function VideoControls({
                 />
               </div>
 
-              <div className="text-sm text-slate-300 font-mono tracking-wide ml-2">
+              <div className="text-[13px] text-white/70 tabular-nums tracking-wide ml-2">
                 {formatTime(currentTime)} / {formatTime(duration)}
               </div>
             </div>
@@ -176,7 +173,7 @@ export default function VideoControls({
             <div className="flex items-center gap-2">
               <div className="relative">
                 <button 
-                  className={cn("p-2 rounded-full hover:bg-white/20 text-white transition-all transform hover:scale-110", showSettingsMenu && "bg-white/20")} 
+                  className={cn("p-2 rounded-full hover:bg-white/15 text-white/90 hover:text-white transition-all active:scale-90", showSettingsMenu && "bg-white/20")} 
                   onClick={() => setShowSettingsMenu(!showSettingsMenu)}
                 >
                   <Settings size={20} />
@@ -192,7 +189,7 @@ export default function VideoControls({
                 />
               </div>
 
-              <button className="p-2 rounded-full hover:bg-white/20 text-white transition-all transform hover:scale-110" onClick={toggleFullscreen}>
+              <button className="p-2 rounded-full hover:bg-white/15 text-white/90 hover:text-white transition-all active:scale-90" onClick={toggleFullscreen}>
                 {isFullscreen ? <Minimize size={20} /> : <Maximize size={20} />}
               </button>
             </div>

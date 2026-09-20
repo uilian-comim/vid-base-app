@@ -1,8 +1,7 @@
 import { memo } from 'react';
 import { useTranslation } from 'react-i18next';
 import { motion } from 'framer-motion';
-import { Folder, ChevronRight, File } from 'lucide-react';
-import { cn } from "@/lib/utils";
+import { Folder, ArrowUpRight } from 'lucide-react';
 
 interface DirectoryCardProps {
   name: string;
@@ -13,104 +12,44 @@ interface DirectoryCardProps {
   index?: number;
 }
 
-export default memo(function DirectoryCard({ 
-  name, 
-  path, 
-  fileCount, 
-  color = 'blue', 
-  onClick,
-  index = 0
-}: DirectoryCardProps) {
+const HUES = { blue: 215, purple: 268, green: 158, orange: 28 };
+
+export default memo(function DirectoryCard({ name, path, fileCount, color = 'blue', onClick, index = 0 }: DirectoryCardProps) {
   const { t } = useTranslation();
-  
-  const cardVariants = {
-    blue: "from-blue-500/10 via-blue-500/5 to-transparent border-blue-200/50 dark:border-blue-500/20 hover:border-blue-400/50 dark:hover:border-blue-400/50 hover:shadow-blue-500/10",
-    purple: "from-purple-500/10 via-purple-500/5 to-transparent border-purple-200/50 dark:border-purple-500/20 hover:border-purple-400/50 dark:hover:border-purple-400/50 hover:shadow-purple-500/10",
-    green: "from-emerald-500/10 via-emerald-500/5 to-transparent border-emerald-200/50 dark:border-emerald-500/20 hover:border-emerald-400/50 dark:hover:border-emerald-400/50 hover:shadow-emerald-500/10",
-    orange: "from-orange-500/10 via-orange-500/5 to-transparent border-orange-200/50 dark:border-orange-500/20 hover:border-orange-400/50 dark:hover:border-orange-400/50 hover:shadow-orange-500/10"
-  };
-
-  const iconVariants = {
-    blue: "text-blue-600 dark:text-blue-400 bg-blue-100 dark:bg-blue-500/20",
-    purple: "text-purple-600 dark:text-purple-400 bg-purple-100 dark:bg-purple-500/20",
-    green: "text-emerald-600 dark:text-emerald-400 bg-emerald-100 dark:bg-emerald-500/20",
-    orange: "text-orange-600 dark:text-orange-400 bg-orange-100 dark:bg-orange-500/20"
-  };
-
-  const glowVariants = {
-    blue: "bg-blue-500",
-    purple: "bg-purple-500",
-    green: "bg-emerald-500",
-    orange: "bg-orange-500"
-  };
+  const hue = HUES[color];
 
   return (
-    <motion.div
-      className={cn(
-        "group relative rounded-2xl p-8 cursor-pointer h-full min-h-[320px] flex flex-col justify-between transition-all duration-300 hover:z-10",
-        "bg-gradient-to-br bg-card/50 backdrop-blur-sm border shadow-sm hover:shadow-2xl",
-        cardVariants[color]
-      )}
+    <motion.button
+      type="button"
       onClick={onClick}
-      initial={{ opacity: 0, y: 20 }}
+      className="surface surface-hover group relative flex h-full min-h-[148px] w-full cursor-pointer flex-col justify-between overflow-hidden rounded-2xl p-5 text-left"
+      initial={{ opacity: 0, y: 14 }}
       animate={{ opacity: 1, y: 0 }}
-      transition={{ 
-        duration: 0.4,
-        delay: index * 0.05,
-        type: "spring",
-        stiffness: 100,
-        damping: 15
-      }}
-      whileHover={{ y: -8, scale: 1.05 }}
+      transition={{ duration: 0.35, delay: Math.min(index, 12) * 0.04, ease: [0.2, 0.8, 0.2, 1] }}
       whileTap={{ scale: 0.98 }}
+      style={{ ['--h' as string]: hue }}
     >
-      {/* Background Glow Effect */}
-      <div className={cn(
-        "absolute -top-20 -right-20 w-40 h-40 rounded-full blur-[60px] opacity-20 dark:opacity-10 transition-opacity group-hover:opacity-40",
-        glowVariants[color]
-      )} />
-      
-      <div className="flex justify-between items-start z-10">
-        <div className={cn(
-          "w-20 h-20 rounded-xl flex items-center justify-center transition-transform duration-300 group-hover:scale-110 group-hover:rotate-3 shadow-sm",
-          iconVariants[color]
-        )}>
-          <Folder size={40} className="fill-current opacity-90" />
+      <div
+        className="pointer-events-none absolute -right-10 -top-10 h-32 w-32 rounded-full opacity-40 blur-3xl transition-opacity duration-300 group-hover:opacity-80"
+        style={{ background: `hsl(${hue} 90% 60%)` }}
+      />
+      <div className="relative flex items-start justify-between">
+        <div
+          className="flex h-11 w-11 items-center justify-center rounded-xl text-white shadow-lg transition-transform duration-300 group-hover:-rotate-3 group-hover:scale-105"
+          style={{ background: `linear-gradient(135deg, hsl(${hue} 90% 62%), hsl(${hue + 30} 85% 50%))`, boxShadow: `0 8px 20px -6px hsl(${hue} 90% 55% / .55)` }}
+        >
+          <Folder size={22} className="fill-white/25" />
         </div>
-        
-        <div className="opacity-0 group-hover:opacity-100 transition-all duration-300 transform translate-x-2 group-hover:translate-x-0">
-          <div className="w-8 h-8 rounded-full bg-foreground/5 hover:bg-foreground/10 flex items-center justify-center backdrop-blur-sm">
-            <ChevronRight size={16} className="text-muted-foreground" />
-          </div>
-        </div>
-      </div>
-      
-      <div className="space-y-3 z-10 mt-4">
-        <div>
-          <h3 className="text-2xl font-bold text-foreground leading-tight tracking-tight line-clamp-1 group-hover:text-primary transition-colors duration-300">
-            {name}
-          </h3>
-          <p className="text-sm text-muted-foreground/70 font-mono truncate mt-1 opacity-60 group-hover:opacity-100 transition-opacity">
-            {path}
-          </p>
-        </div>
-        
-        <div className="flex items-center gap-2 pt-3 border-t border-border/10 group-hover:border-border/30 transition-colors">
-          <div className="flex items-center gap-1.5 text-xs font-medium text-muted-foreground px-2 py-1 rounded-md bg-secondary/50 group-hover:bg-secondary transition-colors">
-            <File size={12} className="opacity-70" />
-            <span>{t('common.items', { count: fileCount })}</span>
-          </div>
-        </div>
+        <ArrowUpRight size={18} className="text-muted-foreground/40 transition-all duration-300 group-hover:-translate-y-0.5 group-hover:translate-x-0.5 group-hover:text-foreground" />
       </div>
 
-      {/* Decorative Bottom Bar */}
-      <div className={cn(
-        "absolute bottom-0 left-0 h-1 w-full bg-gradient-to-r opacity-0 group-hover:opacity-100 transition-opacity duration-300",
-        color === 'blue' && "from-blue-500/0 via-blue-500 to-blue-500/0",
-        color === 'purple' && "from-purple-500/0 via-purple-500 to-purple-500/0",
-        color === 'green' && "from-emerald-500/0 via-emerald-500 to-emerald-500/0",
-        color === 'orange' && "from-orange-500/0 via-orange-500 to-orange-500/0",
-      )} />
-    </motion.div>
+      <div className="relative mt-5 min-w-0">
+        <h3 className="truncate font-heading text-[16px] font-semibold leading-tight">{name}</h3>
+        <p className="mt-1 truncate font-mono text-[11px] text-muted-foreground/60" title={path}>{path}</p>
+        <span className="mt-3 inline-flex items-center rounded-full bg-foreground/[0.06] px-2.5 py-1 text-[11px] font-medium text-muted-foreground">
+          {t('common.items', { count: fileCount })}
+        </span>
+      </div>
+    </motion.button>
   );
 });

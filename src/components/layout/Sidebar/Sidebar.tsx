@@ -1,12 +1,9 @@
 import { motion } from "framer-motion";
-import { Settings as SettingsIcon } from "lucide-react";
+import { Home, PlayCircle, Library, Film, FileText, Folder, Settings as SettingsIcon, Search, Plus } from "lucide-react";
 import { useTranslation } from 'react-i18next';
 import { cn } from "@/lib/utils";
 import React from "react";
 import { Directory } from "../../../contexts/FilesContext";
-import SidebarNavigation from "./SidebarNavigation";
-import SidebarFileTypes from "./SidebarFileTypes";
-import SidebarDirectories from "./SidebarDirectories";
 
 interface SidebarProps {
   activeNav: string;
@@ -22,83 +19,124 @@ interface SidebarProps {
   directories: Directory[];
   filesCount: number;
   navigateToDirectory: (path: string) => void;
+  onOpenSearch: () => void;
+}
+
+const IS_MAC = navigator.userAgent.includes('Macintosh');
+
+interface ItemProps {
+  icon: React.ReactNode;
+  label: string;
+  active: boolean;
+  onClick: () => void;
+  badge?: number;
+}
+
+function NavItem({ icon, label, active, onClick, badge }: ItemProps) {
+  return (
+    <button
+      onClick={onClick}
+      className={cn(
+        "group relative flex w-full items-center gap-3 rounded-xl px-3 py-2 text-left text-[13.5px] font-medium transition-colors cursor-pointer",
+        active ? "text-foreground" : "text-muted-foreground hover:text-foreground hover:bg-foreground/5"
+      )}
+    >
+      {active && (
+        <motion.span
+          layoutId="nav-pill"
+          className="absolute inset-0 rounded-xl bg-foreground/[0.07] ring-1 ring-foreground/10"
+          transition={{ type: "spring", stiffness: 500, damping: 38 }}
+        />
+      )}
+      <span className={cn("relative z-10 shrink-0 transition-colors", active && "text-primary")}>{icon}</span>
+      <span className="relative z-10 truncate">{label}</span>
+      {badge !== undefined && (
+        <span className="relative z-10 ml-auto text-[11px] tabular-nums text-muted-foreground/80">{badge}</span>
+      )}
+    </button>
+  );
+}
+
+function SectionLabel({ children, action }: { children: React.ReactNode; action?: React.ReactNode }) {
+  return (
+    <div className="mt-6 mb-1.5 flex items-center justify-between px-3 text-[10.5px] font-semibold uppercase tracking-[0.12em] text-muted-foreground/60">
+      <span>{children}</span>
+      {action}
+    </div>
+  );
 }
 
 const Sidebar = React.memo(({
-  activeNav,
-  setActiveNav,
-  showSettings,
-  setShowSettings,
-  browserPath,
-  setBrowserPath,
-  fileTypeFilter,
-  setFileTypeFilter,
-  videoCount,
-  documentCount,
-  directories,
-  filesCount,
-  navigateToDirectory
+  activeNav, setActiveNav, showSettings, setShowSettings,
+  browserPath, setBrowserPath, fileTypeFilter, setFileTypeFilter,
+  videoCount, documentCount, directories, filesCount, navigateToDirectory, onOpenSearch
 }: SidebarProps) => {
   const { t } = useTranslation();
 
+  const go = (nav: string, filter: 'video' | 'document' | null = null) => {
+    setActiveNav(nav);
+    setBrowserPath('');
+    setFileTypeFilter(filter);
+    setShowSettings(false);
+  };
+
+  const inApp = !showSettings;
+
   return (
-    <aside className="w-[280px] bg-sidebar border-r border-sidebar-border flex flex-col overflow-y-auto shrink-0 transition-colors duration-300">
-      <div className="p-6 border-b border-sidebar-border">
-        <motion.h1 
-          className="text-2xl font-bold font-heading bg-gradient-to-br from-sidebar-primary to-[#667eea] bg-clip-text text-transparent m-0"
-          initial={{ opacity: 0, y: -10 }}
-          animate={{ opacity: 1, y: 0 }}
-        >
-          VidBase
-        </motion.h1>
+    <aside className="flex w-[248px] shrink-0 flex-col px-3 pb-3">
+      {/* Brand */}
+      <div className="flex items-center gap-2.5 px-3 pt-1 pb-4">
+        <div className="brand-bg flex h-7 w-7 items-center justify-center rounded-lg shadow-lg shadow-primary/30">
+          <PlayCircle size={16} className="text-white" strokeWidth={2.5} />
+        </div>
+        <span className="font-heading text-[17px] font-bold tracking-tight">VidBase</span>
       </div>
 
-      <SidebarNavigation 
-        activeNav={activeNav}
-        setActiveNav={setActiveNav}
-        showSettings={showSettings}
-        setShowSettings={setShowSettings}
-        setBrowserPath={setBrowserPath}
-        fileTypeFilter={fileTypeFilter}
-        setFileTypeFilter={setFileTypeFilter}
-      />
+      {/* Search trigger */}
+      <button
+        onClick={onOpenSearch}
+        className="mb-4 flex w-full items-center gap-2 rounded-xl border border-foreground/10 bg-foreground/[0.04] px-3 py-2 text-[13px] text-muted-foreground transition-colors hover:bg-foreground/[0.08] cursor-pointer"
+      >
+        <Search size={15} />
+        <span>{t('palette.search')}</span>
+        <span className="ml-auto flex gap-1"><kbd className="kbd">{IS_MAC ? '⌘' : 'Ctrl'}</kbd><kbd className="kbd">K</kbd></span>
+      </button>
 
-      <SidebarFileTypes 
-        activeNav={activeNav}
-        setActiveNav={setActiveNav}
-        showSettings={showSettings}
-        setShowSettings={setShowSettings}
-        setBrowserPath={setBrowserPath}
-        fileTypeFilter={fileTypeFilter}
-        setFileTypeFilter={setFileTypeFilter}
-        videoCount={videoCount}
-        documentCount={documentCount}
-      />
+      <nav className="flex flex-col gap-0.5">
+        <NavItem icon={<Home size={17} />} label={t('sidebar.home')} active={inApp && activeNav === 'inicio'} onClick={() => go('inicio')} />
+        <NavItem icon={<PlayCircle size={17} />} label={t('sidebar.continue_watching')} active={inApp && activeNav === 'continuar'} onClick={() => go('continuar')} />
+        <NavItem icon={<Library size={17} />} label={t('sidebar.all_files')} active={inApp && activeNav === 'arquivos' && !fileTypeFilter} onClick={() => go('arquivos')} badge={filesCount} />
+      </nav>
 
-      <SidebarDirectories 
-        browserPath={browserPath}
-        directories={directories}
-        navigateToDirectory={navigateToDirectory}
-      />
+      <SectionLabel>{t('sidebar.file_types')}</SectionLabel>
+      <nav className="flex flex-col gap-0.5">
+        <NavItem icon={<Film size={17} />} label={t('sidebar.videos')} active={inApp && activeNav === 'arquivos' && fileTypeFilter === 'video'} onClick={() => go('arquivos', 'video')} badge={videoCount} />
+        <NavItem icon={<FileText size={17} />} label={t('sidebar.documents')} active={inApp && activeNav === 'arquivos' && fileTypeFilter === 'document'} onClick={() => go('arquivos', 'document')} badge={documentCount} />
+      </nav>
 
-      {/* Settings Button */}
-      <div className="mt-auto pt-4 w-full flex flex-col">
-        <motion.button
-          className={cn(
-            "flex items-center justify-center gap-2 mx-4 mb-4 p-3 active:scale-95 bg-sidebar-primary text-sidebar-primary-foreground border-none rounded-md text-sm font-medium cursor-pointer transition-all shadow-sm hover:bg-sidebar-primary/90 hover:shadow-md",
-            showSettings && "bg-sidebar-primary/90 shadow-md ring-2 ring-sidebar-ring ring-offset-2"
-          )}
-          onClick={() => setShowSettings(true)}
-          whileHover={{ scale: 1.05 }}
-          whileTap={{ scale: 0.95 }}
-        >
-          <SettingsIcon size={20} className="shrink-0" />
-          <span>{t('sidebar.settings')}</span>
-        </motion.button>
+      <SectionLabel
+        action={
+          <button onClick={() => setShowSettings(true)} title={t('palette.add_folder')} className="rounded-md p-0.5 transition-colors hover:bg-foreground/10 hover:text-foreground cursor-pointer">
+            <Plus size={14} />
+          </button>
+        }
+      >
+        {t('sidebar.directories')}
+      </SectionLabel>
+      <nav className="-mr-1 flex min-h-0 flex-1 flex-col gap-0.5 overflow-y-auto pr-1">
+        {directories.map((dir) => (
+          <NavItem
+            key={dir.path}
+            icon={<Folder size={17} />}
+            label={dir.name}
+            active={inApp && activeNav === 'diretorios' && browserPath === dir.path}
+            onClick={() => navigateToDirectory(dir.path)}
+          />
+        ))}
+      </nav>
 
-        <div className="p-4 border-t border-sidebar-border text-xs text-muted-foreground text-center">
-          {filesCount} {t('common.files')} • {directories.length} {t('common.folders')}
-        </div>
+      <div className="mt-3 border-t border-foreground/10 pt-3">
+        <NavItem icon={<SettingsIcon size={17} />} label={t('sidebar.settings')} active={showSettings} onClick={() => setShowSettings(true)} />
       </div>
     </aside>
   );

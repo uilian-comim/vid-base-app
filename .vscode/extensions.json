@@ -5,7 +5,6 @@
     "ms-azuretools.vscode-containers",
     "ms-kubernetes-tools.vscode-kubernetes-tools",
     "ms-vscode.powershell",
-    "leonardssh.vscord",
     "redhat.vscode-yaml"
   ]
 }

@@ -180,5 +180,27 @@
     },
     "thumbnail": {
         "alt": "Thumbnail"
+    },
+    "palette": {
+        "greet_morning": "Good morning",
+        "greet_afternoon": "Good afternoon",
+        "greet_evening": "Good evening",
+        "tagline": "What are we watching today?",
+        "search_placeholder": "Search files, folders and actions…",
+        "no_results": "Nothing found",
+        "go_to": "Go to",
+        "actions": "Actions",
+        "files": "Files",
+        "folders": "Folders",
+        "open": "Open",
+        "resume": "Resume",
+        "search": "Search",
+        "pick_up": "Pick up where you left off",
+        "add_folder": "Add folder",
+        "your_folders": "Your folders",
+        "hint_navigate": "navigate",
+        "hint_open": "open",
+        "hint_close": "close",
+        "left": "left"
     }
 }

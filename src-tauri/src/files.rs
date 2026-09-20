@@ -10,7 +10,14 @@ pub struct FileEntry {
 }
 
 #[tauri::command]
-pub fn list_media_files(paths: Vec<String>) -> Vec<FileEntry> {
+pub async fn list_media_files(paths: Vec<String>) -> Vec<FileEntry> {
+    // Sync commands run on the main thread; walk the disk on a blocking thread instead.
+    tauri::async_runtime::spawn_blocking(move || scan_media_files(paths))
+        .await
+        .unwrap_or_default()
+}
+
+fn scan_media_files(paths: Vec<String>) -> Vec<FileEntry> {
     let mut files = Vec::new();
     let video_extensions = vec!["mp4", "mkv", "ts", "avi", "mov", "webm"];
     let doc_extensions = vec!["pdf"];

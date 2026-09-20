@@ -3,18 +3,20 @@ import { getCurrentWindow } from '@tauri-apps/api/window';
 import { invoke } from '@tauri-apps/api/core';
 import { Minus, Square, X, Copy } from 'lucide-react';
 
+const IS_MAC = navigator.userAgent.includes('Macintosh');
+
 export default function Titlebar() {
   const [isMaximized, setIsMaximized] = useState(false);
   const appWindow = getCurrentWindow();
 
   useEffect(() => {
-    // Check initial state
-    appWindow.isMaximized().then(setIsMaximized);
+    // macOS uses native traffic lights; querying isMaximized there re-triggers resize events in a loop
+    if (IS_MAC) return;
 
-    // Listen for resize events to update the maximize icon
+    appWindow.isMaximized().then(setIsMaximized);
     const unlisten = appWindow.onResized(async () => {
       const maximized = await appWindow.isMaximized();
-      setIsMaximized(maximized);
+      setIsMaximized((prev) => (prev === maximized ? prev : maximized));
     });
 
     return () => {
@@ -22,45 +24,22 @@ export default function Titlebar() {
     };
   }, []);
 
-  const handleMinimize = () => invoke('window_minimize');
-  const handleToggleMaximize = () => invoke('window_toggle_maximize');
-  const handleClose = () => invoke('window_close');
+  // Native traffic lights overlay the top-left corner; keep only a drag region
+  if (IS_MAC) {
+    return <div data-tauri-drag-region className="h-9 w-full shrink-0 select-none" />;
+  }
+
+  const btn = "inline-flex h-full w-11 cursor-pointer items-center justify-center text-muted-foreground transition-colors hover:bg-foreground/10 hover:text-foreground";
 
   return (
-    <div className="h-8 flex select-none justify-between bg-background border-b border-border/50 text-foreground w-full">
-      {/* Área arrastável customizada, ocupa todo o espaço que sobra */}
-      <div 
-        data-tauri-drag-region
-        className="flex-1 flex h-full items-center px-4" 
-      >
-        <span className="text-xs font-semibold tracking-wide text-foreground/80 pointer-events-none">
-          Minha Biblioteca
-        </span>
-      </div>
-
-      {/* Container dos botões fora da área de drag */}
+    <div className="flex h-9 w-full shrink-0 select-none justify-between">
+      <div data-tauri-drag-region className="flex flex-1 items-center px-4" />
       <div className="flex h-full shrink-0">
-        <button
-          onClick={handleMinimize}
-          className="inline-flex h-full w-12 cursor-pointer items-center justify-center transition-colors hover:bg-muted/50 text-foreground/80 hover:text-foreground"
-          title="Minimizar"
-        >
-          <Minus size={16} />
+        <button onClick={() => invoke('window_minimize')} className={btn} title="Minimizar"><Minus size={15} /></button>
+        <button onClick={() => invoke('window_toggle_maximize')} className={btn} title={isMaximized ? "Restaurar" : "Maximizar"}>
+          {isMaximized ? <Copy size={13} className="rotate-180" /> : <Square size={12} />}
         </button>
-        <button
-          onClick={handleToggleMaximize}
-          className="inline-flex h-full w-12 cursor-pointer items-center justify-center transition-colors hover:bg-muted/50 text-foreground/80 hover:text-foreground"
-          title={isMaximized ? "Restaurar" : "Maximizar"}
-        >
-          {isMaximized ? <Copy size={14} className="rotate-180" /> : <Square size={14} />}
-        </button>
-        <button
-          onClick={handleClose}
-          className="inline-flex h-full w-12 cursor-pointer items-center justify-center transition-colors hover:bg-red-500 hover:text-white text-foreground/80"
-          title="Fechar"
-        >
-          <X size={16} />
-        </button>
+        <button onClick={() => invoke('window_close')} className={`${btn} hover:!bg-red-500 hover:!text-white`} title="Fechar"><X size={16} /></button>
       </div>
     </div>
   );

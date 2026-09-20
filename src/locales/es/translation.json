@@ -180,5 +180,27 @@
     },
     "thumbnail": {
         "alt": "Miniatura"
+    },
+    "palette": {
+        "greet_morning": "Buenos días",
+        "greet_afternoon": "Buenas tardes",
+        "greet_evening": "Buenas noches",
+        "tagline": "¿Qué vamos a ver hoy?",
+        "search_placeholder": "Buscar archivos, carpetas y acciones…",
+        "no_results": "Sin resultados",
+        "go_to": "Ir a",
+        "actions": "Acciones",
+        "files": "Archivos",
+        "folders": "Carpetas",
+        "open": "Abrir",
+        "resume": "Reanudar",
+        "search": "Buscar",
+        "pick_up": "Continúa donde lo dejaste",
+        "add_folder": "Añadir carpeta",
+        "your_folders": "Tus carpetas",
+        "hint_navigate": "navegar",
+        "hint_open": "abrir",
+        "hint_close": "cerrar",
+        "left": "restante"
     }
 }
