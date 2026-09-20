@@ -7,6 +7,7 @@ import { useSettings } from '../../contexts/SettingsContext';
 import { useWatchHistory } from '../../contexts/WatchHistoryContext';
 import { useToast } from '../../contexts/ToastContext';
 import ConfirmationModal from '../ConfirmationModal';
+import UpdateSettings from './UpdateSettings';
 
 export default function AdvancedSettings() {
   const { t } = useTranslation();
@@ -95,6 +96,8 @@ export default function AdvancedSettings() {
       </div>
       
       <div className="flex flex-col gap-4 mt-2">
+        <UpdateSettings />
+
         <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4 bg-orange-500/5 border border-orange-500/10 rounded-xl p-5 backdrop-blur-sm group hover:bg-orange-500/10 transition-colors">
           <div className="flex-1 pr-4">
             <label className="text-base font-medium text-foreground mb-1 flex items-center gap-2">

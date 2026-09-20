@@ -6,7 +6,8 @@ import { SettingsProvider, useSettings } from "./contexts/SettingsContext";
 import { invoke } from '@tauri-apps/api/core';
 import { WatchHistoryProvider, useWatchHistory } from "./contexts/WatchHistoryContext";
 import { FilesProvider, useFiles, FileEntry } from "./contexts/FilesContext";
-import { ToastProvider } from "./contexts/ToastContext";
+import { ToastProvider, useToast } from "./contexts/ToastContext";
+import { check } from "@tauri-apps/plugin-updater";
 import Sidebar from "./components/layout/Sidebar/Sidebar";
 import Titlebar from "./components/Titlebar";
 import CommandPalette from "./components/CommandPalette";
@@ -43,6 +44,17 @@ function AppContent() {
   
   const { settings } = useSettings();
   const { addToHistory, getLastWatched } = useWatchHistory();
+  const { showToast } = useToast();
+
+  // Silent update check on startup
+  useEffect(() => {
+    check()
+      .then((update) => {
+        if (update) showToast(t('settings.update_toast', { version: update.version }), 'info');
+      })
+      .catch(() => {});
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, []);
 
   // Global Discord RPC cleanup when the feature is disabled
   useEffect(() => {

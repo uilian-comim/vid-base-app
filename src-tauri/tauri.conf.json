@@ -40,6 +40,15 @@
       "icons/128x128@2x.png",
       "icons/icon.icns",
       "icons/icon.ico"
-    ]
+    ],
+    "createUpdaterArtifacts": true
+  },
+  "plugins": {
+    "updater": {
+      "pubkey": "dW50cnVzdGVkIGNvbW1lbnQ6IG1pbmlzaWduIHB1YmxpYyBrZXk6IEU3NzhBRkEyMTRGODY1MjkKUldRcFpmZ1VvcTk0NXlBaFdzcHBxOEVlMjIzdm52VkJJSVBtNHNodXNRK3dmL1JSYWdXcDZBdjEK",
+      "endpoints": [
+        "https://github.com/uilian-comim/vid-base-app/releases/latest/download/latest.json"
+      ]
+    }
   }
 }

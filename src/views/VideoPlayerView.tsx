@@ -1,4 +1,4 @@
-import { useRef, useEffect, useState, useCallback } from 'react';
+import { useRef, useEffect, useState, useCallback, useMemo } from 'react';
 import { useTranslation } from 'react-i18next';
 import { motion } from 'framer-motion';
 import { X, Play, Check, List, Folder } from 'lucide-react';
@@ -355,9 +355,15 @@ export default function VideoPlayerView({ file, onClose, onPlayFile, onNavigate 
   }, []);
 
   // Discord Rich Presence Integration
-  const startTs = isPlaying && videoRef.current 
-    ? Math.floor(Date.now() / 1000) - Math.floor(videoRef.current.currentTime)
-    : undefined;
+  // Only recomputed when playback starts/stops, otherwise the changing value would
+  // re-trigger the presence update on every render and hit Discord's rate limit.
+  const startTs = useMemo(
+    () => isPlaying && videoRef.current
+      ? Math.floor(Date.now() / 1000) - Math.floor(videoRef.current.currentTime)
+      : undefined,
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+    [isPlaying]
+  );
 
   useDiscordRPC({
     activityState: isPlaying ? t('video.watching', 'Assistindo') : t('video.paused', 'Pausado'),

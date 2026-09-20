@@ -93,6 +93,14 @@ async function getStore(): Promise<Store> {
   return store;
 }
 
+async function applyWindowSize(resolution: Resolution) {
+  const appWindow = getCurrentWindow();
+  if (await appWindow.isFullscreen()) await appWindow.setFullscreen(false);
+  if (await appWindow.isMaximized()) await appWindow.unmaximize();
+  await appWindow.setSize(new LogicalSize(resolution.width, resolution.height));
+  await appWindow.center();
+}
+
 export function SettingsProvider({ children }: { children: ReactNode }) {
   const [settings, setSettings] = useState<AppSettings>(DEFAULT_SETTINGS);
   const [isLoaded, setIsLoaded] = useState(false);
@@ -106,6 +114,10 @@ export function SettingsProvider({ children }: { children: ReactNode }) {
         
         if (stored) {
           setSettings({ ...DEFAULT_SETTINGS, ...stored });
+          const saved = stored.resolution;
+          if (saved && (saved.width !== DEFAULT_SETTINGS.resolution.width || saved.height !== DEFAULT_SETTINGS.resolution.height)) {
+            applyWindowSize(saved).catch(err => console.error('Failed to restore window size:', err));
+          }
         }
       } catch (error) {
         console.error('Failed to load settings:', error);
@@ -157,9 +169,7 @@ export function SettingsProvider({ children }: { children: ReactNode }) {
 
   const updateResolution = async (resolution: Resolution) => {
     try {
-      const appWindow = getCurrentWindow();
-      const size = new LogicalSize(resolution.width, resolution.height);
-      await appWindow.setSize(size);
+      await applyWindowSize(resolution);
       setSettings(prev => ({ ...prev, resolution }));
     } catch (error) {
       console.error('Failed to update resolution:', error);
