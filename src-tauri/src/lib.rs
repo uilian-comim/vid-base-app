@@ -42,48 +42,6 @@ fn window_close(window: tauri::Window) {
     let _ = window.close();
 }
 
-#[tauri::command]
-fn restart_app(app: tauri::AppHandle) {
-    #[cfg(target_os = "macos")]
-    {
-        // Relaunching the executable directly is unreliable after an in-place update
-        // on macOS, so reopen the .app bundle through `open` once this process exits.
-        // The helper runs in its own process group with stdio detached so it survives
-        // our exit; its output goes to a log file to make failures diagnosable.
-        use std::os::unix::process::CommandExt;
-        use std::process::{Command, Stdio};
-
-        if let Some(bundle) = std::env::current_exe().ok().and_then(|exe| {
-            exe.ancestors()
-                .find(|p| p.extension().map_or(false, |e| e == "app"))
-                .map(|p| p.to_path_buf())
-        }) {
-            let log_path = std::env::temp_dir().join("vidbase_restart.log");
-            let log = std::fs::File::create(&log_path).ok();
-            let (out, err) = match log.and_then(|f| f.try_clone().ok().map(|c| (f, c))) {
-                Some((a, b)) => (Stdio::from(a), Stdio::from(b)),
-                None => (Stdio::null(), Stdio::null()),
-            };
-            let script = "while kill -0 \"$1\" 2>/dev/null; do sleep 0.2; done; sleep 0.5; echo \"opening $0\"; open -n \"$0\"; echo \"open exit=$?\"";
-            let spawned = Command::new("/bin/sh")
-                .arg("-c")
-                .arg(script)
-                .arg(&bundle)
-                .arg(std::process::id().to_string())
-                .stdin(Stdio::null())
-                .stdout(out)
-                .stderr(err)
-                .process_group(0)
-                .spawn();
-            if spawned.is_ok() {
-                app.exit(0);
-                return;
-            }
-        }
-    }
-    app.restart();
-}
-
 #[cfg_attr(mobile, tauri::mobile_entry_point)]
 pub fn run() {
     volume_mixer::init();
@@ -116,7 +74,6 @@ pub fn run() {
             window_minimize,
             window_toggle_maximize,
             window_close,
-            restart_app,
             discord_rpc::set_discord_activity,   // <-- NEW
             discord_rpc::clear_discord_activity  // <-- NEW
         ])
