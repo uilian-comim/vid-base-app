@@ -2,6 +2,7 @@ import { useState, useEffect } from 'react';
 import { useTranslation } from 'react-i18next';
 import { convertFileSrc } from '@tauri-apps/api/core';
 import { cn } from "@/lib/utils";
+import { needsServerPlayback, thumbnailUrl } from '../../lib/mediaServer';
 
 interface VideoThumbnailProps {
   filePath: string;
@@ -15,6 +16,13 @@ export default function VideoThumbnail({ filePath, time, className, maxWidth = 3
   const [thumbnail, setThumbnail] = useState<string | null>(null);
 
   useEffect(() => {
+    // Containers the webview can't decode get their frame from ffmpeg instead.
+    if (needsServerPlayback(filePath)) {
+      setThumbnail(thumbnailUrl(filePath, time, maxWidth));
+      return;
+    }
+    setThumbnail(null);
+
     let video: HTMLVideoElement | null = document.createElement('video');
     const canvas = document.createElement('canvas');
     
@@ -68,13 +76,18 @@ export default function VideoThumbnail({ filePath, time, className, maxWidth = 3
       }
     };
 
+    // e.g. an MP4 with HEVC on a webview without an HEVC decoder.
+    const onError = () => setThumbnail(thumbnailUrl(filePath, time, maxWidth));
+
     video.addEventListener('loadedmetadata', onLoadedMetadata);
     video.addEventListener('seeked', onSeeked);
+    video.addEventListener('error', onError);
     
     return () => {
       if (video) {
         video.removeEventListener('loadedmetadata', onLoadedMetadata);
         video.removeEventListener('seeked', onSeeked);
+        video.removeEventListener('error', onError);
         video.remove();
         
         try {
@@ -92,7 +105,7 @@ export default function VideoThumbnail({ filePath, time, className, maxWidth = 3
   }, [filePath, time, maxWidth]);
 
   if (thumbnail) {
-    return <img src={thumbnail} alt={t('thumbnail.alt')} className={className} style={{ width: '100%', height: '100%', objectFit: 'cover' }} />;
+    return <img src={thumbnail} alt={t('thumbnail.alt')} className={className} style={{ width: '100%', height: '100%', objectFit: 'cover' }} onError={() => setThumbnail(null)} />;
   }
   
   return (

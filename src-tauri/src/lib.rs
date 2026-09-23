@@ -1,6 +1,8 @@
 mod discord_rpc;
 use tauri::Manager;
 mod files;
+mod media;
+mod mkv_cues;
 mod streamer;
 mod volume_mixer; // <-- NEW
 

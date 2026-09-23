@@ -16,12 +16,16 @@ jobs:
         include:
           - platform: macos-latest
             args: --target aarch64-apple-darwin
+            target: aarch64-apple-darwin
           - platform: macos-latest
             args: --target x86_64-apple-darwin
+            target: x86_64-apple-darwin
           - platform: windows-latest
             args: ""
+            target: x86_64-pc-windows-msvc
           - platform: ubuntu-22.04
             args: ""
+            target: x86_64-unknown-linux-gnu
     runs-on: ${{ matrix.platform }}
     steps:
       - uses: actions/checkout@v5
@@ -43,6 +47,9 @@ jobs:
           workspaces: src-tauri
 
       - run: bun install --frozen-lockfile
+
+      - name: Download ffmpeg sidecars
+        run: bun run ffmpeg:fetch ${{ matrix.target }}
 
       - uses: tauri-apps/tauri-action@v1.0.0
         env:

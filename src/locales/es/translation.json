@@ -97,7 +97,17 @@
         "playback_speed": "Velocidad de reproducción",
         "normal": "Normal",
         "watching": "Viendo",
-        "paused": "Pausado"
+        "paused": "Pausado",
+        "audio": "Audio",
+        "subtitles": "Subtítulos",
+        "off": "Desactivados",
+        "track": "Pista {{number}}",
+        "forced": "Forzados",
+        "external_file": "Archivo externo",
+        "transcoding": "Convertido",
+        "transcoding_hint": "El códec de este video no es compatible con el sistema, así que se está convirtiendo a H.264 en tiempo real.",
+        "preparing": "Preparando video...",
+        "playback_error": "No se pudo reproducir este video."
     },
     "common": {
         "items_one": "{{count}} elemento",

@@ -1,10 +1,11 @@
 import { motion, AnimatePresence } from 'framer-motion';
 import { Play, Pause, SkipBack, SkipForward, VolumeX, Volume2, Settings, Minimize, Maximize } from 'lucide-react';
 import { cn } from "@/lib/utils";
-import PlayerSettingsMenu from './PlayerSettingsMenu';
+import PlayerSettingsMenu, { type PlayerMenu } from './PlayerSettingsMenu';
 import { formatTime } from '../../utils/utils';
 import { convertFileSrc } from '@tauri-apps/api/core';
 import { useSettings } from '../../contexts/SettingsContext';
+import { type AudioStreamInfo, type SubtitleTrackInfo, thumbnailUrl } from '../../lib/mediaServer';
 
 interface VideoControlsProps {
   show: boolean;
@@ -28,13 +29,21 @@ interface VideoControlsProps {
   toggleFullscreen: () => void;
   showSettingsMenu: boolean;
   setShowSettingsMenu: (show: boolean) => void;
-  activeMenu: 'main' | 'speed';
-  setActiveMenu: (menu: 'main' | 'speed') => void;
+  activeMenu: PlayerMenu;
+  setActiveMenu: (menu: PlayerMenu) => void;
   playbackRate: number;
   setPlaybackRate: (rate: number) => void;
   videoHeight?: number;
   onPlaybackRateChange: (rate: number) => void;
-  isStreamableFormat: boolean;
+  /** Seek previews come from ffmpeg when the webview can't decode the file itself. */
+  useServerPreview: boolean;
+  isTranscoding: boolean;
+  audioTracks: AudioStreamInfo[];
+  audioIndex?: number;
+  onAudioChange: (index: number) => void;
+  subtitleTracks: SubtitleTrackInfo[];
+  subtitleId: string | null;
+  onSubtitleChange: (id: string | null) => void;
 }
 
 export default function VideoControls({
@@ -64,7 +73,14 @@ export default function VideoControls({
   playbackRate,
   videoHeight,
   onPlaybackRateChange,
-  isStreamableFormat
+  useServerPreview,
+  isTranscoding,
+  audioTracks,
+  audioIndex,
+  onAudioChange,
+  subtitleTracks,
+  subtitleId,
+  onSubtitleChange
 }: VideoControlsProps) {
   const { settings } = useSettings();
 
@@ -92,7 +108,7 @@ export default function VideoControls({
                 className="absolute bottom-8 -translate-x-1/2 bg-zinc-900/90 backdrop-blur-xl border border-white/10 rounded-xl p-1 flex flex-col items-center pointer-events-none z-20 shadow-2xl overflow-hidden min-w-[160px]"
                 style={{ left: previewLeft }}
               >
-                {!isStreamableFormat ? (
+                {!useServerPreview ? (
                   <div className="w-[180px] aspect-video bg-black flex items-center justify-center overflow-hidden rounded-lg relative">
                     <video
                       ref={previewVideoRef}
@@ -106,7 +122,7 @@ export default function VideoControls({
                 ) : (
                   <div className="w-[180px] aspect-video bg-black flex items-center justify-center overflow-hidden rounded-lg relative">
                     <img 
-                      src={`http://127.0.0.1:8765/thumbnail?path=${encodeURIComponent(filePath)}&time=${previewTime !== null ? Math.floor(previewTime) : 0}`}
+                      src={thumbnailUrl(filePath, previewTime, 360)}
                       className="w-full h-full object-cover"
                       alt="Preview"
                     />
@@ -186,6 +202,13 @@ export default function VideoControls({
                   playbackRate={playbackRate}
                   onPlaybackRateChange={onPlaybackRateChange}
                   videoHeight={videoHeight}
+                  isTranscoding={isTranscoding}
+                  audioTracks={audioTracks}
+                  audioIndex={audioIndex}
+                  onAudioChange={onAudioChange}
+                  subtitleTracks={subtitleTracks}
+                  subtitleId={subtitleId}
+                  onSubtitleChange={onSubtitleChange}
                 />
               </div>
 

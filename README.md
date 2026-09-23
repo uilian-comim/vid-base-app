@@ -6,7 +6,7 @@ A modern, fast, and lightweight native video player built with [Tauri](https://v
 
 ## Features
 
-- **Media Playback**: Robust support for popular video formats including `MKV`, `TS`, `MP4`, and more.
+- **Media Playback**: Robust support for popular video formats including `MKV`, `TS`, `AVI`, `MP4`, and more, with audio track selection and subtitles (embedded or sidecar `.srt`/`.ass`/`.vtt` files).
 - **Continue Watching**: Automatically remembers your playback position so you can pick up exactly where you left off.
 - **Library Management**: Browse directories, view detailed file cards, and access non-video files seamlessly.
 - **Customization & Themes**: Beautiful UI with dark mode support and smooth animations using Framer Motion.
@@ -39,6 +39,17 @@ Make sure you have the following installed to build and run the project:
    ```bash
    npm run tauri:dev
    ```
+
+   The first run downloads static `ffmpeg`/`ffprobe` builds into `src-tauri/binaries/` (see `scripts/fetch-ffmpeg.ts`); they are bundled with the app as Tauri sidecars, so end users don't need ffmpeg installed.
+
+### How playback works
+
+Files the webview can decode (e.g. H.264 MP4) play natively. Everything else is served by a local server (`src-tauri/src/streamer.rs`) as an on-demand HLS playlist played with hls.js:
+
+- Segments are cut on video keyframes (read from the MKV `Cues` index, or an `ffprobe` scan cached on disk for other containers) and stream-copied, so seeking is instant and video quality is untouched.
+- Audio is copied when it's already AAC, otherwise converted to AAC.
+- Video codecs the webview can't decode (e.g. HEVC on Windows, 10-bit H.264, VP9/MPEG-4 in AVI) are transcoded to H.264 per segment.
+- Text subtitles are converted to WebVTT; image-based ones (PGS/VobSub) are not supported yet.
 
 ### Building for Production
 

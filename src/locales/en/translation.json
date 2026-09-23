@@ -97,7 +97,17 @@
         "playback_speed": "Playback Speed",
         "normal": "Normal",
         "watching": "Watching",
-        "paused": "Paused"
+        "paused": "Paused",
+        "audio": "Audio",
+        "subtitles": "Subtitles",
+        "off": "Off",
+        "track": "Track {{number}}",
+        "forced": "Forced",
+        "external_file": "External file",
+        "transcoding": "Converted",
+        "transcoding_hint": "This video's codec isn't supported by the system, so it's being converted to H.264 on the fly.",
+        "preparing": "Preparing video...",
+        "playback_error": "This video couldn't be played."
     },
     "common": {
         "items_one": "{{count}} item",

@@ -1,17 +1,20 @@
 import { useRef, useEffect, useState, useCallback, useMemo } from 'react';
 import { useTranslation } from 'react-i18next';
 import { motion } from 'framer-motion';
-import { X, Play, Check, List, Folder } from 'lucide-react';
-import { convertFileSrc } from '@tauri-apps/api/core';
+import { X, Play, Check, List, Folder, AlertTriangle } from 'lucide-react';
 import { FileEntry } from '../contexts/FilesContext';
 import { useWatchHistory } from '../contexts/WatchHistoryContext';
 import { useSettings } from '../contexts/SettingsContext';
 import { cn } from "@/lib/utils";
 import VideoControls from '../components/player/VideoControls';
+import { type PlayerMenu } from '../components/player/PlayerSettingsMenu';
+import LoadingSpinner from '../components/LoadingSpinner';
 import EpisodesList from '../components/player/EpisodesList';
 import { useVideoShortcuts } from '../hooks/useVideoShortcuts';
 import { useDiscordRPC } from '../hooks/useDiscordRPC';
 import { useFolderSiblings } from '../hooks/useFolderSiblings';
+import { useMediaPlayback } from '../hooks/useMediaPlayback';
+import { useSubtitles } from '../hooks/useSubtitles';
 
 interface VideoPlayerViewProps {
   file: FileEntry;
@@ -43,7 +46,7 @@ export default function VideoPlayerView({ file, onClose, onPlayFile, onNavigate 
   const [playbackRate, setPlaybackRate] = useState(1.0);
   const [isFullscreen, setIsFullscreen] = useState(false);
   const [showSettingsMenu, setShowSettingsMenu] = useState(false);
-  const [activeMenu, setActiveMenu] = useState<'main' | 'speed'>('main');
+  const [activeMenu, setActiveMenu] = useState<PlayerMenu>('main');
   const [showControls, setShowControls] = useState(true);
   const [showSidebar, setShowSidebar] = useState(true);
 
@@ -51,81 +54,51 @@ export default function VideoPlayerView({ file, onClose, onPlayFile, onNavigate 
   const [previewTime, setPreviewTime] = useState<number | null>(null);
   const [previewLeft, setPreviewLeft] = useState<number>(0);
 
-  // FMP4 Streaming State
-  const initialOffset = (() => {
-      const historyItem = history.find(h => h.filePath === file.path);
-      return historyItem ? historyItem.currentTime : 0;
-  })();
-  const [streamOffset, setStreamOffset] = useState(initialOffset);
-  const streamOffsetRef = useRef(initialOffset);
+  const [isBuffering, setIsBuffering] = useState(false);
+
+  const initialTime = useMemo(
+    () => history.find(h => h.filePath === file.path)?.currentTime ?? 0,
+    // Only the position at open time matters; later history updates come from this player.
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+    [file.path]
+  );
   const currentDurationRef = useRef(0);
-  const lastKnownTimeRef = useRef(initialOffset);
+  const lastKnownTimeRef = useRef(initialTime);
 
-  // Stabilized streamable handling
-
-  const isStreamableFormat = (path: string) => {
-      const lower = path.toLowerCase();
-      // MKV and TS formats will hit the rust Axum server which runs ffmpeg behind the scenes
-      // and converts the stream to fragmented MP4.
-      return lower.endsWith('.ts') || lower.endsWith('.mkv');
-  };
+  // Native playback when the webview supports the file, otherwise HLS from the local ffmpeg server.
+  const playback = useMediaPlayback({ videoRef, filePath: file.path, startTime: initialTime });
+  const subtitles = useSubtitles(videoRef, playback.info);
 
   // Video Logic
   useEffect(() => {
     const video = videoRef.current;
     if (!video) return;
 
-    let progressInterval: number;
-
-    const setupStream = async () => {
-        if (isStreamableFormat(file.path)) {
-            try {
-                // 1. Fetch exact duration natively parsed by ffprobe
-                const response = await fetch(`http://127.0.0.1:8765/video-info?path=${encodeURIComponent(file.path)}`);
-                const data = await response.json();
-                if (data.duration) {
-                    setDuration(data.duration);
-                    currentDurationRef.current = data.duration;
-                }
-            } catch (error) {
-                console.error("Failed to get video info:", error);
-            }
-        }
-    };
-    
-    setupStream();
+    let progressInterval: number | undefined;
 
     const handleTimeUpdate = () => {
-      let t = video.currentTime;
-      if (isStreamableFormat(file.path)) {
-          t += streamOffsetRef.current;
+      lastKnownTimeRef.current = video.currentTime;
+      setCurrentTime(video.currentTime);
+    };
+
+    const handleDurationChange = () => {
+      if (Number.isFinite(video.duration) && video.duration > 0) {
+        setDuration(video.duration);
+        currentDurationRef.current = video.duration;
       }
-      lastKnownTimeRef.current = t;
-      setCurrentTime(t);
     };
 
     const handleLoadedMetadata = () => {
-      if (!isStreamableFormat(file.path)) {
-          if (video.duration && video.duration !== Infinity && !isNaN(video.duration)) {
-              setDuration(video.duration);
-              currentDurationRef.current = video.duration;
+      handleDurationChange();
+      if (progressInterval === undefined) {
+        progressInterval = window.setInterval(() => {
+          const t = lastKnownTimeRef.current;
+          if (t > 0) {
+            updateProgress(file.path, t, currentDurationRef.current);
           }
+        }, 5000);
       }
-      
-      
-      progressInterval = window.setInterval(() => {
-         let t = lastKnownTimeRef.current;
-         if (t > 0) {
-           updateProgress(file.path, t, currentDurationRef.current);
-         }
-       }, 5000);
     };
-
-    if (video.readyState >= 1) {
-        handleLoadedMetadata();
-    } else {
-        video.addEventListener('loadedmetadata', handleLoadedMetadata);
-    }
 
     const handlePlayPause = () => setIsPlaying(!video.paused);
     const handleVolumeChange = () => {
@@ -133,6 +106,8 @@ export default function VideoPlayerView({ file, onClose, onPlayFile, onNavigate 
         setIsMuted(video.muted);
     };
     const handleRateChange = () => setPlaybackRate(video.playbackRate);
+    const handleWaiting = () => setIsBuffering(true);
+    const handleResume = () => setIsBuffering(false);
 
     const handleEnded = () => {
       setIsPlaying(false);
@@ -141,28 +116,36 @@ export default function VideoPlayerView({ file, onClose, onPlayFile, onNavigate 
     };
 
     video.addEventListener('timeupdate', handleTimeUpdate);
+    video.addEventListener('durationchange', handleDurationChange);
     video.addEventListener('loadedmetadata', handleLoadedMetadata);
     video.addEventListener('play', handlePlayPause);
     video.addEventListener('pause', handlePlayPause);
     video.addEventListener('volumechange', handleVolumeChange);
     video.addEventListener('ratechange', handleRateChange);
     video.addEventListener('ended', handleEnded);
+    video.addEventListener('waiting', handleWaiting);
+    video.addEventListener('playing', handleResume);
+    video.addEventListener('seeked', handleResume);
 
     return () => {
       clearInterval(progressInterval);
       video.removeEventListener('timeupdate', handleTimeUpdate);
+      video.removeEventListener('durationchange', handleDurationChange);
       video.removeEventListener('loadedmetadata', handleLoadedMetadata);
       video.removeEventListener('play', handlePlayPause);
       video.removeEventListener('pause', handlePlayPause);
       video.removeEventListener('volumechange', handleVolumeChange);
       video.removeEventListener('ratechange', handleRateChange);
       video.removeEventListener('ended', handleEnded);
-      
-      let t = lastKnownTimeRef.current;
+      video.removeEventListener('waiting', handleWaiting);
+      video.removeEventListener('playing', handleResume);
+      video.removeEventListener('seeked', handleResume);
+
+      const t = lastKnownTimeRef.current;
       if (t > 0) {
         updateProgress(file.path, t, currentDurationRef.current);
       }
-      
+
       // Explicitly stop playback
       try {
         video.pause();
@@ -172,42 +155,14 @@ export default function VideoPlayerView({ file, onClose, onPlayFile, onNavigate 
     };
   }, [file.path, updateProgress]);
 
-  // Restore time for non-streamable formats
-  const lastRestoredPathRef = useRef<string | null>(null);
-
+  // The server knows the exact duration before the first segment arrives.
   useEffect(() => {
-      if (lastRestoredPathRef.current === file.path) return;
-      
-      const playVideo = () => {
-          if (videoRef.current) {
-              const p = videoRef.current.play();
-              if (p !== undefined) p.catch((e) => console.warn("Auto-play failed:", e));
-          }
-      };
+    if (playback.info?.duration && !currentDurationRef.current) {
+      setDuration(playback.info.duration);
+      currentDurationRef.current = playback.info.duration;
+    }
+  }, [playback.info]);
 
-      if (isStreamableFormat(file.path)) {
-          playVideo();
-          return; // natively handled by URL parameter
-      }
-
-      const historyItem = history.find(h => h.filePath === file.path);
-      if (historyItem && videoRef.current) {
-          lastRestoredPathRef.current = file.path;
-          const restoreTime = () => {
-             if (videoRef.current && !videoRef.current.played.length) { 
-                 videoRef.current.currentTime = historyItem.currentTime;
-                 playVideo();
-             }
-          }
-          if (videoRef.current.readyState >= 1) {
-              restoreTime();
-          } else {
-              videoRef.current.addEventListener('loadedmetadata', restoreTime, { once: true });
-          }
-      } else {
-          playVideo();
-      }
-  }, [file.path, history]);
   const lastToggleRef = useRef<number>(0);
 
   const togglePlay = useCallback((e?: React.MouseEvent) => {
@@ -231,45 +186,18 @@ export default function VideoPlayerView({ file, onClose, onPlayFile, onNavigate 
 
   const handleSeek = useCallback((e: React.ChangeEvent<HTMLInputElement>) => {
       const time = parseFloat(e.target.value);
-      if (isStreamableFormat(file.path)) {
-          streamOffsetRef.current = time;
-          setStreamOffset(time); // React will update `<video src>` to the exact timestamp
-          if (videoRef.current) {
-              setTimeout(() => {
-                  if (videoRef.current) {
-                      videoRef.current.load();
-                      const p = videoRef.current.play();
-                      if (p !== undefined) p.catch(() => {});
-                  }
-              }, 50);
-          }
-      } else {
-          if (videoRef.current) {
-              videoRef.current.currentTime = time;
-          }
+      if (videoRef.current) {
+          videoRef.current.currentTime = time;
       }
       setCurrentTime(time);
-  }, [file.path]);
+  }, []);
 
   const skip = useCallback((seconds: number) => {
-      if (videoRef.current) {
-          let expectedTime = (isStreamableFormat(file.path) ? streamOffsetRef.current + videoRef.current.currentTime : videoRef.current.currentTime) + seconds;
-          expectedTime = Math.max(0, expectedTime); // prevent negative seek
-          if (isStreamableFormat(file.path)) {
-              streamOffsetRef.current = expectedTime;
-              setStreamOffset(expectedTime);
-              setTimeout(() => {
-                  if (videoRef.current) {
-                      videoRef.current.load();
-                      const p = videoRef.current.play();
-                      if (p !== undefined) p.catch(() => {});
-                  }
-              }, 50);
-          } else {
-              videoRef.current.currentTime += seconds;
-          }
-      }
-  }, [file.path]);
+      const video = videoRef.current;
+      if (!video) return;
+      const end = Number.isFinite(video.duration) ? video.duration : currentDurationRef.current;
+      video.currentTime = Math.max(0, Math.min(video.currentTime + seconds, end || Infinity));
+  }, []);
 
   // Keyboard shortcuts
   useVideoShortcuts({
@@ -406,13 +334,49 @@ export default function VideoPlayerView({ file, onClose, onPlayFile, onNavigate 
               key={file.path}
               ref={videoRef}
               className="w-full h-full object-contain"
-              src={isStreamableFormat(file.path) 
-                  ? `http://127.0.0.1:8765/play?path=${encodeURIComponent(file.path)}&start=${streamOffset}`
-                  : convertFileSrc(file.path)}
             />
+
+            {/* Subtitles are rendered here (not natively) so they can sit above the controls */}
+            {subtitles.cues.length > 0 && (
+              <div
+                className={cn(
+                  "absolute inset-x-0 flex flex-col items-center gap-1 px-[8%] pointer-events-none z-[6] transition-[bottom] duration-200",
+                  showControls ? "bottom-32" : "bottom-10"
+                )}
+              >
+                {subtitles.cues.map((html, i) => (
+                  <div
+                    key={i}
+                    className={cn(
+                      "rounded-md bg-black/60 px-3 py-1 text-center font-semibold leading-snug text-white whitespace-pre-line [text-shadow:0_1px_3px_rgba(0,0,0,0.9)]",
+                      isFullscreen ? "text-4xl" : "text-2xl"
+                    )}
+                    dangerouslySetInnerHTML={{ __html: html }}
+                  />
+                ))}
+              </div>
+            )}
+
+            {(playback.status === 'loading' || (isBuffering && playback.status !== 'error')) && (
+              <div className="absolute inset-0 flex items-center justify-center pointer-events-none z-[4]">
+                <LoadingSpinner
+                  size="large"
+                  message={playback.status === 'loading' ? t('video.preparing') : undefined}
+                  className="rounded-2xl bg-black/40 backdrop-blur-sm"
+                />
+              </div>
+            )}
+
+            {playback.status === 'error' && (
+              <div className="absolute inset-0 flex flex-col items-center justify-center gap-3 bg-black/80 p-8 text-center z-[7]">
+                <AlertTriangle size={40} className="text-amber-400" />
+                <p className="text-lg font-semibold text-white">{t('video.playback_error')}</p>
+                {playback.error && <p className="max-w-xl text-sm text-slate-400 break-words">{playback.error}</p>}
+              </div>
+            )}
             
             {/* Play overlay when paused */}
-            {!isPlaying && (
+            {!isPlaying && playback.status === 'ready' && (
                 <div 
                   className="absolute top-1/2 left-1/2 -translate-x-1/2 -translate-y-1/2 w-20 h-20 bg-black/40 backdrop-blur-sm rounded-full flex items-center justify-center cursor-pointer z-[5] transition-all border-2 border-white/10 hover:bg-primary/80 hover:scale-110" 
                   onClick={togglePlay}
@@ -450,7 +414,14 @@ export default function VideoPlayerView({ file, onClose, onPlayFile, onNavigate 
                 setPlaybackRate={setPlaybackRate}
                 videoHeight={videoRef.current?.videoHeight}
                 onPlaybackRateChange={handlePlaybackRateChange}
-                isStreamableFormat={isStreamableFormat(file.path)}
+                useServerPreview={playback.mode === 'hls'}
+                isTranscoding={playback.isTranscoding}
+                audioTracks={playback.info?.audio ?? []}
+                audioIndex={playback.audioIndex}
+                onAudioChange={playback.setAudioIndex}
+                subtitleTracks={playback.info?.subtitles ?? []}
+                subtitleId={subtitles.selectedId}
+                onSubtitleChange={subtitles.setSelectedId}
             />
           </div>
 

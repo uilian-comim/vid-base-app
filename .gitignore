@@ -36,3 +36,6 @@ Thumbs.db
 # Tauri build outputs (ensuring they are ignored at root level too)
 src-tauri/target/
 src-tauri/gen/
+
+# ffmpeg/ffprobe sidecars (downloaded by scripts/fetch-ffmpeg.ts)
+src-tauri/binaries/

@@ -8,6 +8,7 @@ import { useWatchHistory } from '../../contexts/WatchHistoryContext';
 import { useToast } from '../../contexts/ToastContext';
 import ConfirmationModal from '../ConfirmationModal';
 import UpdateSettings from './UpdateSettings';
+import { MEDIA_SERVER } from '../../lib/mediaServer';
 
 export default function AdvancedSettings() {
   const { t } = useTranslation();
@@ -43,8 +44,8 @@ export default function AdvancedSettings() {
 
   const executeClearCache = async () => {
     try {
-      // 1. Force the Rust server to kill any active FFmpeg processes
-      await fetch('http://127.0.0.1:8765/stop-stream').catch(() => {});
+      // 1. Drop the media server's probe and subtitle caches
+      await fetch(`${MEDIA_SERVER}/clear-cache`).catch(() => {});
       
       // 2. Clear the video cache via Tauri
       await invoke('clear_video_cache');
