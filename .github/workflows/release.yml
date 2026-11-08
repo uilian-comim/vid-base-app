@@ -59,7 +59,14 @@ jobs:
         with:
           tagName: ${{ github.ref_name }}
           releaseName: "Vidbase ${{ github.ref_name }}"
-          releaseBody: "Veja os assets abaixo para baixar a versão do seu sistema."
+          releaseBody: |
+            Veja os assets abaixo para baixar a versão do seu sistema.
+
+            **macOS:** o app ainda não é notarizado pela Apple. Depois de arrastar o vidbase para Aplicativos, na primeira abertura o macOS vai bloquear o app. Para liberar, vá em **Ajustes do Sistema → Privacidade e Segurança** e clique em **Abrir Mesmo Assim**, ou rode no Terminal:
+
+            ```sh
+            xattr -dr com.apple.quarantine /Applications/vidbase.app
+            ```
           releaseDraft: false
           prerelease: false
           args: ${{ matrix.args }}
