@@ -107,7 +107,9 @@
         "transcoding": "Converted",
         "transcoding_hint": "This video's codec isn't supported by the system, so it's being converted to H.264 on the fly.",
         "preparing": "Preparing video...",
-        "playback_error": "This video couldn't be played."
+        "playback_error": "This video couldn't be played.",
+        "muted": "Muted",
+        "no_subtitles": "No subtitles"
     },
     "common": {
         "items_one": "{{count}} item",

@@ -6,6 +6,8 @@ import { type AudioStreamInfo, type SubtitleTrackInfo, channelLabel, languageNam
 
 export type PlayerMenu = 'main' | 'speed' | 'audio' | 'subtitles';
 
+export const PLAYBACK_RATES = [0.5, 0.75, 1, 1.25, 1.5, 2];
+
 interface PlayerSettingsMenuProps {
   show: boolean;
   activeMenu: PlayerMenu;
@@ -188,7 +190,7 @@ export default function PlayerSettingsMenu({
             >
               <SubmenuHeader title={t('video.playback_speed')} onBack={() => setActiveMenu('main')} />
               <div className="flex flex-col gap-0.5 max-h-64 overflow-y-auto px-1 pb-1">
-                {[0.5, 0.75, 1, 1.25, 1.5, 2].map(rate => (
+                {PLAYBACK_RATES.map(rate => (
                   <OptionRow
                     key={rate}
                     label={rate === 1 ? t('video.normal') : `${rate}x`}

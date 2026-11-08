@@ -107,7 +107,9 @@
         "transcoding": "Convertido",
         "transcoding_hint": "O codec deste vídeo não é suportado pelo sistema, então ele está sendo convertido para H.264 em tempo real.",
         "preparing": "Preparando vídeo...",
-        "playback_error": "Não foi possível reproduzir este vídeo."
+        "playback_error": "Não foi possível reproduzir este vídeo.",
+        "muted": "Mudo",
+        "no_subtitles": "Sem legendas"
     },
     "common": {
         "items_one": "{{count}} item",

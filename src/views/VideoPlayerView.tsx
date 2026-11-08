@@ -7,7 +7,8 @@ import { useWatchHistory } from '../contexts/WatchHistoryContext';
 import { useSettings } from '../contexts/SettingsContext';
 import { cn } from "@/lib/utils";
 import VideoControls from '../components/player/VideoControls';
-import { type PlayerMenu } from '../components/player/PlayerSettingsMenu';
+import { type PlayerMenu, PLAYBACK_RATES } from '../components/player/PlayerSettingsMenu';
+import { languageName } from '../lib/mediaServer';
 import LoadingSpinner from '../components/LoadingSpinner';
 import EpisodesList from '../components/player/EpisodesList';
 import { useVideoShortcuts } from '../hooks/useVideoShortcuts';
@@ -15,6 +16,7 @@ import { useDiscordRPC } from '../hooks/useDiscordRPC';
 import { useFolderSiblings } from '../hooks/useFolderSiblings';
 import { useMediaPlayback } from '../hooks/useMediaPlayback';
 import { useSubtitles } from '../hooks/useSubtitles';
+import { getCurrentWindow } from '@tauri-apps/api/window';
 
 interface VideoPlayerViewProps {
   file: FileEntry;
@@ -24,7 +26,7 @@ interface VideoPlayerViewProps {
 }
 
 export default function VideoPlayerView({ file, onClose, onPlayFile, onNavigate }: VideoPlayerViewProps) {
-  const { t } = useTranslation();
+  const { t, i18n } = useTranslation();
   const videoRef = useRef<HTMLVideoElement>(null);
   const previewVideoRef = useRef<HTMLVideoElement>(null);
   const containerRef = useRef<HTMLDivElement>(null);
@@ -199,14 +201,6 @@ export default function VideoPlayerView({ file, onClose, onPlayFile, onNavigate 
       video.currentTime = Math.max(0, Math.min(video.currentTime + seconds, end || Infinity));
   }, []);
 
-  // Keyboard shortcuts
-  useVideoShortcuts({
-    skip,
-    togglePlay,
-    videoSkipBackward: settings.videoSkipBackward,
-    videoSkipForward: settings.videoSkipForward
-  });
-
   const toggleMute = useCallback(() => {
       if (videoRef.current) {
           videoRef.current.muted = !videoRef.current.muted;
@@ -221,22 +215,122 @@ export default function VideoPlayerView({ file, onClose, onPlayFile, onNavigate 
       }
   }, []);
 
-  const toggleFullscreen = useCallback(() => {
-      if (!document.fullscreenElement) {
-          containerRef.current?.requestFullscreen();
-      } else {
-          document.exitFullscreen();
+  // The webview's element Fullscreen API is unavailable (macOS) or only fills the window
+  // (Windows), so fullscreen is the Tauri window going fullscreen with the player covering it.
+  const isFullscreenRef = useRef(false);
+  // Whether the window was already fullscreen (e.g. via the OS) before the player took it over;
+  // leaving player fullscreen then keeps the window as the user had it.
+  const windowWasFullscreenRef = useRef(false);
+
+  const setPlayerFullscreen = useCallback(async (next: boolean) => {
+      const appWindow = getCurrentWindow();
+      try {
+          if (next) {
+              windowWasFullscreenRef.current = await appWindow.isFullscreen();
+              if (!windowWasFullscreenRef.current) await appWindow.setFullscreen(true);
+          } else if (!windowWasFullscreenRef.current) {
+              await appWindow.setFullscreen(false);
+          }
+          isFullscreenRef.current = next;
+          setIsFullscreen(next);
+      } catch (e) {
+          console.error('Failed to toggle fullscreen:', e);
       }
   }, []);
 
-  useEffect(() => {
-      const handleFullscreenChange = () => {
-          setIsFullscreen(!!document.fullscreenElement);
-      };
+  const toggleFullscreen = useCallback(() => {
+      setPlayerFullscreen(!isFullscreenRef.current);
+  }, [setPlayerFullscreen]);
 
-      document.addEventListener('fullscreenchange', handleFullscreenChange);
-      return () => document.removeEventListener('fullscreenchange', handleFullscreenChange);
+  useEffect(() => {
+      const appWindow = getCurrentWindow();
+      // Leaving fullscreen through the OS (green button, Ctrl+Cmd+F) must restore the player layout.
+      const unlistenPromise = appWindow.onResized(async () => {
+          if (isFullscreenRef.current && !windowWasFullscreenRef.current && !(await appWindow.isFullscreen())) {
+              isFullscreenRef.current = false;
+              setIsFullscreen(false);
+          }
+      });
+      return () => {
+          unlistenPromise.then((unlisten) => unlisten());
+          // Closing the player must not leave the library stuck in fullscreen.
+          if (isFullscreenRef.current && !windowWasFullscreenRef.current) {
+              appWindow.setFullscreen(false).catch(() => {});
+          }
+      };
   }, []);
+
+  // Brief on-screen feedback for keyboard actions (volume, speed, subtitles...).
+  const [osd, setOsd] = useState<{ text: string; id: number } | null>(null);
+  const osdTimeoutRef = useRef<number | null>(null);
+  const showOsd = useCallback((text: string) => {
+      setOsd({ text, id: Date.now() });
+      if (osdTimeoutRef.current) window.clearTimeout(osdTimeoutRef.current);
+      osdTimeoutRef.current = window.setTimeout(() => setOsd(null), 900);
+  }, []);
+  useEffect(() => () => {
+      if (osdTimeoutRef.current) window.clearTimeout(osdTimeoutRef.current);
+  }, []);
+
+  // Keyboard shortcuts
+  useVideoShortcuts({
+    videoSkipBackward: settings.videoSkipBackward,
+    videoSkipForward: settings.videoSkipForward,
+    isFullscreen,
+    togglePlay,
+    toggleFullscreen,
+    skip: (seconds) => {
+        skip(seconds);
+        showOsd(`${seconds > 0 ? '+' : '−'}${Math.abs(seconds)}s`);
+    },
+    seekToFraction: (fraction) => {
+        const video = videoRef.current;
+        if (!video) return;
+        const end = Number.isFinite(video.duration) ? video.duration : currentDurationRef.current;
+        if (end) video.currentTime = Math.max(0, Math.min(fraction * end, end - 0.1));
+    },
+    changeVolume: (delta) => {
+        const video = videoRef.current;
+        if (!video) return;
+        const next = Math.round(Math.max(0, Math.min(1, (video.muted ? 0 : video.volume) + delta)) * 100) / 100;
+        video.volume = next;
+        video.muted = next === 0;
+        showOsd(next === 0 ? t('video.muted') : `${Math.round(next * 100)}%`);
+    },
+    toggleMute: () => {
+        const video = videoRef.current;
+        if (!video) return;
+        video.muted = !video.muted;
+        showOsd(video.muted ? t('video.muted') : `${Math.round(video.volume * 100)}%`);
+    },
+    changeSpeed: (direction) => {
+        const current = videoRef.current?.playbackRate ?? 1;
+        const index = PLAYBACK_RATES.findIndex((r) => r >= current);
+        const from = index === -1 ? PLAYBACK_RATES.length - 1 : index;
+        const rate = PLAYBACK_RATES[Math.max(0, Math.min(PLAYBACK_RATES.length - 1, from + direction))];
+        handlePlaybackRateChange(rate);
+        showOsd(rate === 1 ? t('video.normal') : `${rate}x`);
+    },
+    toggleSubtitles: () => {
+        const tracks = playback.info?.subtitles ?? [];
+        if (tracks.length === 0) {
+            showOsd(t('video.no_subtitles'));
+        } else if (subtitles.selectedId) {
+            subtitles.setSelectedId(null);
+            showOsd(`${t('video.subtitles')}: ${t('video.off')}`);
+        } else {
+            const track = tracks.find((s) => s.default) ?? tracks[0];
+            subtitles.setSelectedId(track.id);
+            const label = track.title ?? languageName(track.language, i18n.language) ?? t('video.track', { number: tracks.indexOf(track) + 1 });
+            showOsd(`${t('video.subtitles')}: ${label}`);
+        }
+    },
+    playAdjacent: (direction) => {
+        const index = siblings.findIndex((s) => s.path === file.path);
+        const target = index === -1 ? undefined : siblings[index + direction];
+        if (target) onPlayFile(target);
+    },
+  });
 
   const handleMouseMove = useCallback(() => {
       setShowControls(true);
@@ -322,7 +416,7 @@ export default function VideoPlayerView({ file, onClose, onPlayFile, onNavigate 
           <div 
             className={cn(
               "w-full overflow-hidden relative flex items-center justify-center bg-black",
-              isFullscreen ? "h-full rounded-none" : "aspect-video max-h-[80vh] rounded-2xl shadow-2xl border border-white/5"
+              isFullscreen ? "fixed inset-0 z-[70] rounded-none" : "aspect-video max-h-[80vh] rounded-2xl shadow-2xl border border-white/5"
             )}
             ref={containerRef}
             onMouseMove={handleMouseMove}
@@ -335,6 +429,15 @@ export default function VideoPlayerView({ file, onClose, onPlayFile, onNavigate 
               ref={videoRef}
               className="w-full h-full object-contain"
             />
+
+            {osd && (
+              <div
+                key={osd.id}
+                className="absolute top-8 left-1/2 -translate-x-1/2 z-[8] pointer-events-none rounded-xl bg-black/70 px-5 py-2.5 text-xl font-semibold text-white backdrop-blur-sm shadow-lg"
+              >
+                {osd.text}
+              </div>
+            )}
 
             {/* Subtitles are rendered here (not natively) so they can sit above the controls */}
             {subtitles.cues.length > 0 && (
