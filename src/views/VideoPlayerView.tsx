@@ -39,6 +39,10 @@ export default function VideoPlayerView({ file, onClose, onPlayFile, onNavigate 
   
   const isWatched = checkWatchedStatus(file.path);
 
+  const currentIndex = useMemo(() => siblings.findIndex((s) => s.path === file.path), [siblings, file.path]);
+  const previousEpisode = currentIndex > 0 ? siblings[currentIndex - 1] : undefined;
+  const nextEpisode = currentIndex === -1 ? undefined : siblings[currentIndex + 1];
+
   // Player State
   const [isPlaying, setIsPlaying] = useState(false);
   const [currentTime, setCurrentTime] = useState(0);
@@ -326,8 +330,7 @@ export default function VideoPlayerView({ file, onClose, onPlayFile, onNavigate 
         }
     },
     playAdjacent: (direction) => {
-        const index = siblings.findIndex((s) => s.path === file.path);
-        const target = index === -1 ? undefined : siblings[index + direction];
+        const target = direction === 1 ? nextEpisode : previousEpisode;
         if (target) onPlayFile(target);
     },
   });
@@ -347,6 +350,12 @@ export default function VideoPlayerView({ file, onClose, onPlayFile, onNavigate 
   const handleToggleWatched = useCallback(() => {
       toggleWatchedStatus(file.path, !isWatched);
   }, [file.path, isWatched, toggleWatchedStatus]);
+
+  const handleCopyPath = useCallback((path: string) => {
+      navigator.clipboard.writeText(path)
+          .then(() => showOsd(t('video.path_copied')))
+          .catch((e) => console.error('Failed to copy path:', e));
+  }, [showOsd, t]);
 
   const handleProgressMouseMove = useCallback((e: React.MouseEvent<HTMLDivElement>) => {
       const rect = e.currentTarget.getBoundingClientRect();
@@ -395,7 +404,7 @@ export default function VideoPlayerView({ file, onClose, onPlayFile, onNavigate 
 
   return (
     <motion.div 
-      className={cn("fixed z-50 bg-background flex flex-col", isFullscreen ? "inset-0" : "inset-x-0 bottom-0 top-8")}
+      className={cn("dark fixed z-50 bg-background text-foreground flex flex-col", isFullscreen ? "inset-0" : "inset-x-0 bottom-0 top-9")}
       initial={{ opacity: 0 }}
       animate={{ opacity: 1 }}
       exit={{ opacity: 0 }}
@@ -502,7 +511,8 @@ export default function VideoPlayerView({ file, onClose, onPlayFile, onNavigate 
                 handleProgressMouseLeave={handleProgressMouseLeave}
                 previewVideoRef={previewVideoRef}
                 filePath={file.path}
-                skip={skip}
+                onPreviousEpisode={previousEpisode ? () => onPlayFile(previousEpisode) : undefined}
+                onNextEpisode={nextEpisode ? () => onPlayFile(nextEpisode) : undefined}
                 volume={volume}
                 isMuted={isMuted}
                 toggleMute={toggleMute}
@@ -564,7 +574,7 @@ export default function VideoPlayerView({ file, onClose, onPlayFile, onNavigate 
                 <button 
                     className={cn(
                         "flex items-center gap-2.5 px-5 py-2.5 rounded-xl border border-white/10 bg-white/5 text-slate-200 text-sm font-semibold transition-all hover:bg-white/10 hover:border-white/20 hover:text-white hover:-translate-y-0.5 hover:shadow-lg hover:shadow-primary/5",
-                        showSidebar && "bg-primary/10 border-primary/30 text-primary-300 shadow-lg shadow-primary/5"
+                        showSidebar && "bg-primary/10 border-primary/30 text-primary shadow-lg shadow-primary/5"
                     )}
                     onClick={() => setShowSidebar(!showSidebar)}
                 >
@@ -583,6 +593,8 @@ export default function VideoPlayerView({ file, onClose, onPlayFile, onNavigate 
                 currentFile={file}
                 onPlayFile={onPlayFile}
                 checkWatchedStatus={checkWatchedStatus}
+                onToggleWatched={toggleWatchedStatus}
+                onCopyPath={handleCopyPath}
             />
         )}
       </div>

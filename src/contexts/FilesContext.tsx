@@ -147,11 +147,11 @@ export function FilesProvider({ children }: { children: ReactNode }) {
         }
       }
       
-      // Sort: Directories first, then files, alphabetically
+      // Sort: directories first, then files, in natural order ("Episode 2" before "Episode 10")
       return processedEntries.sort((a, b) => {
         if (a.type === 'directory' && b.type !== 'directory') return -1;
         if (a.type !== 'directory' && b.type === 'directory') return 1;
-        return a.name.localeCompare(b.name);
+        return a.name.localeCompare(b.name, undefined, { numeric: true, sensitivity: 'base' });
       });
     } catch (error) {
       console.error(`Error listing directory ${path}:`, error);

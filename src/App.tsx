@@ -207,7 +207,7 @@ function AppContent() {
 
   return (
     <div className="flex flex-col h-screen w-screen bg-sidebar text-foreground overflow-hidden">
-      <Titlebar />
+      <Titlebar forceDark={!!isPlayingVideo} />
       <div className="flex flex-1 h-full w-full overflow-hidden relative">
         {/* Sidebar - Hide if playing video */}
         {!isPlayingVideo && (

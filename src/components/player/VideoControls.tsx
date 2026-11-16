@@ -1,10 +1,10 @@
 import { motion, AnimatePresence } from 'framer-motion';
+import { useTranslation } from 'react-i18next';
 import { Play, Pause, SkipBack, SkipForward, VolumeX, Volume2, Settings, Minimize, Maximize } from 'lucide-react';
 import { cn } from "@/lib/utils";
 import PlayerSettingsMenu, { type PlayerMenu } from './PlayerSettingsMenu';
 import { formatTime } from '../../utils/utils';
 import { convertFileSrc } from '@tauri-apps/api/core';
-import { useSettings } from '../../contexts/SettingsContext';
 import { type AudioStreamInfo, type SubtitleTrackInfo, thumbnailUrl } from '../../lib/mediaServer';
 
 interface VideoControlsProps {
@@ -20,7 +20,9 @@ interface VideoControlsProps {
   handleProgressMouseLeave: () => void;
   previewVideoRef: React.RefObject<HTMLVideoElement | null>;
   filePath: string;
-  skip: (seconds: number) => void;
+  /** Undefined when there is no previous/next episode in the folder. */
+  onPreviousEpisode?: () => void;
+  onNextEpisode?: () => void;
   volume: number;
   isMuted: boolean;
   toggleMute: () => void;
@@ -59,7 +61,8 @@ export default function VideoControls({
   handleProgressMouseLeave,
   previewVideoRef,
   filePath,
-  skip,
+  onPreviousEpisode,
+  onNextEpisode,
   volume,
   isMuted,
   toggleMute,
@@ -82,7 +85,8 @@ export default function VideoControls({
   subtitleId,
   onSubtitleChange
 }: VideoControlsProps) {
-  const { settings } = useSettings();
+  const { t } = useTranslation();
+  const episodeButton = "p-2 rounded-full hover:bg-white/15 text-white/90 hover:text-white transition-all active:scale-90 disabled:opacity-35 disabled:pointer-events-none";
 
   return (
     <AnimatePresence>
@@ -155,10 +159,22 @@ export default function VideoControls({
               </button>
               
               <div className="flex items-center gap-2">
-                <button className="p-2 rounded-full hover:bg-white/15 text-white/90 hover:text-white transition-all active:scale-90" onClick={() => skip(-settings.videoSkipBackward)}>
+                <button
+                  className={episodeButton}
+                  onClick={onPreviousEpisode}
+                  disabled={!onPreviousEpisode}
+                  title={`${t('video.previous_episode')} (Shift+P)`}
+                  aria-label={t('video.previous_episode')}
+                >
                   <SkipBack size={20} />
                 </button>
-                <button className="p-2 rounded-full hover:bg-white/15 text-white/90 hover:text-white transition-all active:scale-90" onClick={() => skip(settings.videoSkipForward)}>
+                <button
+                  className={episodeButton}
+                  onClick={onNextEpisode}
+                  disabled={!onNextEpisode}
+                  title={`${t('video.next_episode')} (Shift+N)`}
+                  aria-label={t('video.next_episode')}
+                >
                   <SkipForward size={20} />
                 </button>
               </div>

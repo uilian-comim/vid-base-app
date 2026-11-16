@@ -109,7 +109,13 @@
         "preparing": "Preparando video...",
         "playback_error": "No se pudo reproducir este video.",
         "muted": "Silenciado",
-        "no_subtitles": "Sin subtítulos"
+        "no_subtitles": "Sin subtítulos",
+        "mark_as_unwatched": "Marcar como no visto",
+        "play": "Reproducir",
+        "copy_path": "Copiar ruta del archivo",
+        "path_copied": "Ruta copiada",
+        "previous_episode": "Episodio anterior",
+        "next_episode": "Episodio siguiente"
     },
     "common": {
         "items_one": "{{count}} elemento",

@@ -109,7 +109,13 @@
         "preparing": "Preparing video...",
         "playback_error": "This video couldn't be played.",
         "muted": "Muted",
-        "no_subtitles": "No subtitles"
+        "no_subtitles": "No subtitles",
+        "mark_as_unwatched": "Mark as unwatched",
+        "play": "Play",
+        "copy_path": "Copy file path",
+        "path_copied": "Path copied",
+        "previous_episode": "Previous episode",
+        "next_episode": "Next episode"
     },
     "common": {
         "items_one": "{{count}} item",

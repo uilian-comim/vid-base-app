@@ -33,7 +33,7 @@ export default function DocumentViewer({ file, onClose, onOpenFile, onNavigate }
 
   return (
     <motion.div 
-      className="fixed inset-0 z-50 bg-background flex flex-col"
+      className="dark fixed inset-0 z-50 bg-background text-foreground flex flex-col"
       initial={{ opacity: 0 }}
       animate={{ opacity: 1 }}
       exit={{ opacity: 0 }}
@@ -88,7 +88,7 @@ export default function DocumentViewer({ file, onClose, onOpenFile, onNavigate }
               <button 
                     className={cn(
                         "flex items-center gap-2 px-4 py-2 rounded-lg border border-white/10 bg-white/5 text-slate-200 text-sm font-semibold transition-all hover:bg-white/10 hover:border-white/20 hover:text-white hover:-translate-y-0.5 hover:shadow-lg hover:shadow-primary/5",
-                        showSidebar && "bg-primary/10 border-primary/30 text-primary-300 shadow-lg shadow-primary/5"
+                        showSidebar && "bg-primary/10 border-primary/30 text-primary shadow-lg shadow-primary/5"
                     )}
                     onClick={() => setShowSidebar(!showSidebar)}
                 >
@@ -130,7 +130,7 @@ export default function DocumentViewer({ file, onClose, onOpenFile, onNavigate }
                                     </div>
                                     
                                     <div className="flex flex-col justify-center gap-0.5 min-w-0">
-                                        <div className={cn("text-sm font-medium leading-snug line-clamp-2 transition-colors", isCurrent ? "text-primary-300 font-bold" : "text-slate-300 group-hover:text-white")}>
+                                        <div className={cn("text-sm font-medium leading-snug line-clamp-2 transition-colors", isCurrent ? "text-primary font-bold" : "text-slate-300 group-hover:text-white")}>
                                             {sibling.name}
                                         </div>
                                     </div>
