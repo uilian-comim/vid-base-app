@@ -53,8 +53,8 @@
     to { height: 0 }
   }
 
-  --font-sans: Inter, -apple-system, BlinkMacSystemFont, sans-serif;
-  --font-heading: Sora, var(--font-sans), sans-serif;
+  --font-sans: "Inter Variable", Inter, -apple-system, BlinkMacSystemFont, sans-serif;
+  --font-heading: "Sora Variable", Sora, var(--font-sans), sans-serif;
 
   --transition-duration-fast: 150ms;
   --transition-duration-base: 250ms;

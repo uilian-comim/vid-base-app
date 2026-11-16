@@ -4735,11 +4735,12 @@ checksum = "0b928f33d975fc6ad9f86c8f283853ad26bdd5b10b7f1542aa2fa15e2289105a"
 
 [[package]]
 name = "vidbase"
-version = "0.2.10"
+version = "0.3.0"
 dependencies = [
  "async-stream",
  "axum",
  "discord-presence",
+ "getrandom 0.3.4",
  "serde",
  "serde_json",
  "sysinfo",

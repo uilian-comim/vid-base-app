@@ -1,56 +1,77 @@
-use serde::{Deserialize, Serialize};
+use serde::Serialize;
 use std::path::Path;
 use walkdir::WalkDir;
 
-#[derive(Debug, Serialize, Deserialize)]
+const VIDEO_EXTENSIONS: &[&str] = &["mp4", "m4v", "mpeg4", "mkv", "ts", "avi", "mov", "wmv", "flv", "webm"];
+const DOCUMENT_EXTENSIONS: &[&str] = &["pdf", "html"];
+
+#[derive(Debug, Serialize, PartialEq)]
 pub struct FileEntry {
     name: String,
     path: String,
-    file_type: String,
+    file_type: &'static str,
 }
 
+/// Scans every library root in one call. The result holds one file list per requested
+/// path, in the same order, so the caller can tell which root each file came from.
 #[tauri::command]
-pub async fn list_media_files(paths: Vec<String>) -> Vec<FileEntry> {
+pub async fn list_media_files(paths: Vec<String>) -> Vec<Vec<FileEntry>> {
     // Sync commands run on the main thread; walk the disk on a blocking thread instead.
-    tauri::async_runtime::spawn_blocking(move || scan_media_files(paths))
+    tauri::async_runtime::spawn_blocking(move || paths.iter().map(|p| scan_media_files(Path::new(p))).collect())
         .await
         .unwrap_or_default()
 }
 
-fn scan_media_files(paths: Vec<String>) -> Vec<FileEntry> {
-    let mut files = Vec::new();
-    let video_extensions = vec!["mp4", "mkv", "ts", "avi", "mov", "webm"];
-    let doc_extensions = vec!["pdf"];
+fn scan_media_files(root: &Path) -> Vec<FileEntry> {
+    WalkDir::new(root)
+        .sort_by_file_name()
+        .into_iter()
+        .filter_map(Result::ok)
+        // The type comes with the directory listing, so this costs no extra stat per file.
+        .filter(|entry| entry.file_type().is_file())
+        .filter_map(|entry| {
+            let name = entry.file_name().to_str()?;
+            let ext = Path::new(name).extension()?.to_str()?.to_lowercase();
+            let file_type = if VIDEO_EXTENSIONS.contains(&ext.as_str()) {
+                "video"
+            } else if DOCUMENT_EXTENSIONS.contains(&ext.as_str()) {
+                "document"
+            } else {
+                return None;
+            };
+            Some(FileEntry {
+                name: name.to_string(),
+                path: entry.path().to_str()?.to_string(),
+                file_type,
+            })
+        })
+        .collect()
+}
 
-    for path_str in paths {
-        let path = Path::new(&path_str);
-        if !path.exists() {
-            continue;
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn scans_nested_media_and_skips_other_files() {
+        let dir = tempfile::tempdir().unwrap();
+        let sub = dir.path().join("Season 1");
+        std::fs::create_dir(&sub).unwrap();
+        for name in ["b.MKV", "a.mp4", "notes.txt", "Season 1/e1.m4v", "Season 1/guide.pdf"] {
+            std::fs::write(dir.path().join(name), b"").unwrap();
         }
 
-        for entry in WalkDir::new(path).into_iter().filter_map(|e| e.ok()) {
-            let path = entry.path();
-            if path.is_file() {
-                if let Some(ext) = path.extension().and_then(|e| e.to_str()) {
-                    let ext_lower = ext.to_lowercase();
-                    let file_type = if video_extensions.contains(&ext_lower.as_str()) {
-                        "video".to_string()
-                    } else if doc_extensions.contains(&ext_lower.as_str()) {
-                        "document".to_string()
-                    } else {
-                        continue;
-                    };
-
-                    if let Some(name) = path.file_name().and_then(|n| n.to_str()) {
-                        files.push(FileEntry {
-                            name: name.to_string(),
-                            path: path.to_string_lossy().to_string(),
-                            file_type,
-                        });
-                    }
-                }
-            }
-        }
+        let files = scan_media_files(dir.path());
+        let summary: Vec<(&str, &str)> = files.iter().map(|f| (f.name.as_str(), f.file_type)).collect();
+        assert_eq!(
+            summary,
+            vec![("e1.m4v", "video"), ("guide.pdf", "document"), ("a.mp4", "video"), ("b.MKV", "video")]
+        );
+        assert_eq!(files[0].path, sub.join("e1.m4v").to_str().unwrap());
     }
-    files
+
+    #[test]
+    fn missing_root_yields_no_files() {
+        assert!(scan_media_files(Path::new("/definitely/not/here")).is_empty());
+    }
 }

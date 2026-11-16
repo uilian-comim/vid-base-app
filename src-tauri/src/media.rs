@@ -11,11 +11,13 @@ use std::collections::hash_map::DefaultHasher;
 use std::hash::{Hash, Hasher};
 use std::path::{Path, PathBuf};
 use std::process::Stdio;
-use std::time::UNIX_EPOCH;
+use std::sync::atomic::{AtomicU64, Ordering};
+use std::sync::Arc;
+use std::time::{Duration, UNIX_EPOCH};
 use tokio::process::Command;
 use tokio::sync::OnceCell;
 
-use crate::mkv_cues;
+use crate::{mkv_cues, mp4_index};
 
 /// Target HLS segment length. Stream-copied segments stretch to the next keyframe.
 const TARGET_SEGMENT_SECS: f64 = 6.0;
@@ -27,6 +29,13 @@ const COPY_PREROLL_SECS: f64 = 2.0;
 /// Tolerance for comparing packet timestamps against segment boundaries.
 const TS_EPSILON: f64 = 0.0005;
 
+const MAX_TRANSCODE_WIDTH: u32 = 1920;
+const ENCODER_PROBE_TIMEOUT: Duration = Duration::from_secs(10);
+
+/// Length of each window used to cross-check a container index against ffprobe.
+const INDEX_CHECK_WINDOW_SECS: f64 = 8.0;
+const INDEX_CHECK_TOLERANCE: f64 = 0.0002;
+
 const SIDECAR_PREFIX: &str = "vidbase-";
 const COPYABLE_VIDEO_CODECS: &[&str] = &["h264", "hevc"];
 const TEXT_SUBTITLE_CODECS: &[&str] = &["subrip", "srt", "ass", "ssa", "webvtt", "mov_text", "text"];
@@ -35,15 +44,111 @@ const EXTERNAL_SUBTITLE_EXTENSIONS: &[&str] = &["srt", "vtt", "ass", "ssa"];
 pub struct Tools {
     pub ffmpeg: PathBuf,
     pub ffprobe: PathBuf,
+    /// Encoder used when a file has to be transcoded; probed on first use.
+    encoder: OnceCell<VideoEncoder>,
 }
 
 impl Tools {
     pub fn resolve() -> Self {
-        Self {
-            ffmpeg: resolve_binary("ffmpeg"),
-            ffprobe: resolve_binary("ffprobe"),
+        Self::new(resolve_binary("ffmpeg"), resolve_binary("ffprobe"))
+    }
+
+    pub fn new(ffmpeg: PathBuf, ffprobe: PathBuf) -> Self {
+        Self { ffmpeg, ffprobe, encoder: OnceCell::new() }
+    }
+
+    /// The fastest H.264 encoder that actually works on this machine: a hardware encoder
+    /// when a short test encode succeeds, otherwise software x264.
+    pub async fn video_encoder(&self) -> VideoEncoder {
+        *self
+            .encoder
+            .get_or_init(|| async {
+                for &encoder in VideoEncoder::hardware_candidates() {
+                    if self.encoder_works(encoder).await {
+                        return encoder;
+                    }
+                }
+                VideoEncoder::X264
+            })
+            .await
+    }
+
+    /// Being listed by `ffmpeg -encoders` only means the encoder was compiled in, not that
+    /// the GPU/driver is present, so run the exact arguments used for real segments.
+    async fn encoder_works(&self, encoder: VideoEncoder) -> bool {
+        let mut cmd = command(&self.ffmpeg);
+        cmd.args(["-hide_banner", "-loglevel", "error", "-nostdin", "-f", "lavfi", "-i"])
+            .arg("color=c=black:s=640x360:r=30:d=0.5")
+            .args(encoder.args(640, 360))
+            .args(["-f", "null", "-"])
+            .stdout(Stdio::null())
+            .stderr(Stdio::null());
+        matches!(tokio::time::timeout(ENCODER_PROBE_TIMEOUT, cmd.status()).await, Ok(Ok(status)) if status.success())
+    }
+}
+
+#[derive(Clone, Copy, PartialEq, Eq, Debug)]
+pub enum VideoEncoder {
+    X264,
+    VideoToolbox,
+    Nvenc,
+    Qsv,
+    Amf,
+}
+
+impl VideoEncoder {
+    fn hardware_candidates() -> &'static [VideoEncoder] {
+        if cfg!(target_os = "macos") {
+            &[VideoEncoder::VideoToolbox]
+        } else if cfg!(windows) {
+            &[VideoEncoder::Nvenc, VideoEncoder::Qsv, VideoEncoder::Amf]
+        } else {
+            &[VideoEncoder::Nvenc, VideoEncoder::Qsv]
         }
     }
+
+    /// Encoder arguments for a source of the given size (0 when unknown). Output is always
+    /// 8-bit 4:2:0 H.264, at most 1920 wide.
+    fn args(self, width: u32, height: u32) -> Vec<String> {
+        let args: Vec<String> = match self {
+            VideoEncoder::X264 => ["-c:v", "libx264", "-preset", "veryfast", "-crf", "21", "-pix_fmt", "yuv420p"]
+                .map(String::from)
+                .to_vec(),
+            // VideoToolbox has no constant-quality mode on every Mac, so target a bitrate.
+            VideoEncoder::VideoToolbox => vec![
+                "-c:v".into(),
+                "h264_videotoolbox".into(),
+                "-b:v".into(),
+                format!("{}k", target_bitrate_kbps(width, height)),
+                "-pix_fmt".into(),
+                "yuv420p".into(),
+            ],
+            VideoEncoder::Nvenc => {
+                ["-c:v", "h264_nvenc", "-preset", "p4", "-rc", "vbr", "-cq", "23", "-b:v", "0", "-pix_fmt", "yuv420p"]
+                    .map(String::from)
+                    .to_vec()
+            }
+            VideoEncoder::Qsv => ["-c:v", "h264_qsv", "-preset", "veryfast", "-global_quality", "23", "-pix_fmt", "nv12"]
+                .map(String::from)
+                .to_vec(),
+            VideoEncoder::Amf => {
+                ["-c:v", "h264_amf", "-quality", "speed", "-rc", "cqp", "-qp_i", "22", "-qp_p", "24", "-pix_fmt", "yuv420p"]
+                    .map(String::from)
+                    .to_vec()
+            }
+        };
+        [args, vec!["-vf".into(), format!("scale='min({MAX_TRANSCODE_WIDTH},iw)':-2")]].concat()
+    }
+}
+
+/// Roughly 8 Mbit/s at 1080p, scaled with the pixel count of the (downscaled) output.
+fn target_bitrate_kbps(width: u32, height: u32) -> u32 {
+    if width == 0 || height == 0 {
+        return 8000;
+    }
+    let scale = (MAX_TRANSCODE_WIDTH as f64 / width as f64).min(1.0);
+    let pixels = (width as f64 * scale) * (height as f64 * scale);
+    (pixels * 0.004).clamp(1500.0, 10_000.0) as u32
 }
 
 /// Prefers the sidecar bundled next to the app executable, then well-known install
@@ -160,8 +265,27 @@ pub fn media_id(path: &Path) -> String {
     format!("{:016x}", h.finish())
 }
 
-pub async fn probe(tools: &Tools, path: &Path) -> Result<Media, String> {
-    let fingerprint = Fingerprint::of(path).ok_or_else(|| format!("File not found: {}", path.display()))?;
+/// The file's identity and its sidecar subtitles. Read on a blocking thread: these touch
+/// the disk, which can stall on network drives.
+pub async fn snapshot(path: &Path) -> (Option<Fingerprint>, Vec<PathBuf>) {
+    let path = path.to_path_buf();
+    tokio::task::spawn_blocking(move || (Fingerprint::of(&path), find_external_subtitles(&path)))
+        .await
+        .unwrap_or((None, Vec::new()))
+}
+
+pub async fn fingerprint(path: &Path) -> Option<Fingerprint> {
+    let path = path.to_path_buf();
+    tokio::task::spawn_blocking(move || Fingerprint::of(&path)).await.ok().flatten()
+}
+
+pub async fn probe(
+    tools: &Tools,
+    path: &Path,
+    fingerprint: Option<Fingerprint>,
+    external_subtitles: Vec<PathBuf>,
+) -> Result<Media, String> {
+    let fingerprint = fingerprint.ok_or_else(|| format!("File not found: {}", path.display()))?;
 
     let output = command(&tools.ffprobe)
         .args(["-v", "error", "-print_format", "json", "-show_format", "-show_streams"])
@@ -229,7 +353,6 @@ pub async fn probe(tools: &Tools, path: &Path) -> Result<Media, String> {
         })
         .collect();
 
-    let external_subtitles = find_external_subtitles(path);
     for (n, sub) in external_subtitles.iter().enumerate() {
         subtitles.push(SubtitleTrack {
             id: format!("x{n}"),
@@ -297,14 +420,28 @@ pub fn find_external_subtitles(video: &Path) -> Vec<PathBuf> {
     subs
 }
 
-fn keyframe_cache_path(path: &Path, fingerprint: Fingerprint, stream: usize) -> PathBuf {
-    let mut h = DefaultHasher::new();
-    (path, fingerprint, stream).hash(&mut h);
-    cache_dir().join(format!("keyframes-{:016x}.json", h.finish()))
-}
-
 pub fn cache_dir() -> PathBuf {
     std::env::temp_dir().join("vidbase_streams")
+}
+
+/// Location of a derived artifact (keyframe index, thumbnail, subtitle track) in the disk
+/// cache. `key` must include the source's fingerprint so edits to the file invalidate it.
+pub fn cache_file(kind: &str, key: impl Hash, extension: &str) -> PathBuf {
+    let mut h = DefaultHasher::new();
+    key.hash(&mut h);
+    cache_dir().join(format!("{kind}-{:016x}.{extension}", h.finish()))
+}
+
+/// Best-effort cache write. Goes through a temp file so a concurrent reader never sees a
+/// half-written entry.
+pub async fn cache_write(target: &Path, bytes: &[u8]) {
+    static COUNTER: AtomicU64 = AtomicU64::new(0);
+    let unique = COUNTER.fetch_add(1, Ordering::Relaxed);
+    let tmp = target.with_extension(format!("{}-{unique}.tmp", std::process::id()));
+    let _ = tokio::fs::create_dir_all(cache_dir()).await;
+    if tokio::fs::write(&tmp, bytes).await.is_ok() && tokio::fs::rename(&tmp, target).await.is_err() {
+        let _ = tokio::fs::remove_file(&tmp).await;
+    }
 }
 
 async fn load_keyframes(tools: &Tools, path: &Path, fingerprint: Fingerprint, stream: usize) -> Option<Vec<f64>> {
@@ -319,24 +456,68 @@ async fn load_keyframes(tools: &Tools, path: &Path, fingerprint: Fingerprint, st
         }
     }
 
-    let cache = keyframe_cache_path(path, fingerprint, stream);
-    if let Some(kfs) = std::fs::read(&cache).ok().and_then(|b| serde_json::from_slice::<Vec<f64>>(&b).ok()) {
+    let cache = cache_file("keyframes", (path, fingerprint, stream), "json");
+    if let Some(kfs) = tokio::fs::read(&cache).await.ok().and_then(|b| serde_json::from_slice::<Vec<f64>>(&b).ok()) {
         return Some(kfs);
     }
 
-    let kfs = scan_keyframes(tools, path, stream).await?;
+    let kfs = match load_mp4_keyframes(tools, path, stream).await {
+        Some(kfs) => kfs,
+        None => scan_keyframes(tools, path, stream).await?,
+    };
     if let Ok(json) = serde_json::to_vec(&kfs) {
-        let _ = std::fs::create_dir_all(cache_dir());
-        let _ = std::fs::write(&cache, json);
+        cache_write(&cache, &json).await;
+    }
+    Some(kfs)
+}
+
+/// Keyframes from the MP4 sample tables, accepted only if ffprobe agrees on a few short
+/// windows of the file. Segments are cut at these timestamps, so an index that is slightly
+/// off (unusual edit lists, muxer quirks) must lose to the slow but exact packet scan.
+async fn load_mp4_keyframes(tools: &Tools, path: &Path, stream: usize) -> Option<Vec<f64>> {
+    let is_mp4 = path
+        .extension()
+        .and_then(|e| e.to_str())
+        .is_some_and(|e| matches!(e.to_lowercase().as_str(), "mp4" | "m4v" | "mov"));
+    if !is_mp4 {
+        return None;
+    }
+    let p = path.to_path_buf();
+    let kfs = tokio::task::spawn_blocking(move || mp4_index::read_keyframes(&p, stream)).await.ok()??;
+
+    let last = *kfs.last()?;
+    for (window, start) in [0.0, kfs[kfs.len() / 2], (last - INDEX_CHECK_WINDOW_SECS).max(0.0)].into_iter().enumerate() {
+        let interval = format!("{start:.3}%+{INDEX_CHECK_WINDOW_SECS}");
+        let seen = probe_keyframes(tools, path, stream, Some(&interval)).await?;
+        // Reading starts at the keyframe at or before `start`, so `seen` is a contiguous
+        // run of the file's keyframes and must equal the same run of the index.
+        let first_seen = *seen.first()?;
+        let from = kfs.partition_point(|kf| *kf < first_seen - INDEX_CHECK_TOLERANCE);
+        let expected = kfs.get(from..from + seen.len())?;
+        let agrees = seen.iter().zip(expected).all(|(a, b)| (a - b).abs() <= INDEX_CHECK_TOLERANCE);
+        if !agrees || (window == 0 && from != 0) {
+            eprintln!("[media] MP4 index of {} disagrees with ffprobe; scanning packets instead", path.display());
+            return None;
+        }
     }
     Some(kfs)
 }
 
 /// Reads every video packet header. Correct for any container, but touches the whole file.
 async fn scan_keyframes(tools: &Tools, path: &Path, stream: usize) -> Option<Vec<f64>> {
-    let output = command(&tools.ffprobe)
-        .args(["-v", "error", "-select_streams"])
-        .arg(stream.to_string())
+    let kfs = probe_keyframes(tools, path, stream, None).await?;
+    (kfs.len() >= 2).then_some(kfs)
+}
+
+/// Sorted keyframe timestamps reported by ffprobe, for the whole file or one
+/// `-read_intervals` window. `None` if ffprobe fails or finds no keyframe.
+async fn probe_keyframes(tools: &Tools, path: &Path, stream: usize, interval: Option<&str>) -> Option<Vec<f64>> {
+    let mut cmd = command(&tools.ffprobe);
+    cmd.args(["-v", "error", "-select_streams"]).arg(stream.to_string());
+    if let Some(interval) = interval {
+        cmd.args(["-read_intervals", interval]);
+    }
+    let output = cmd
         .args(["-show_entries", "packet=pts_time,flags", "-of", "csv=p=0"])
         .arg(path)
         .output()
@@ -351,7 +532,7 @@ async fn scan_keyframes(tools: &Tools, path: &Path, stream: usize) -> Option<Vec
         .collect();
     kfs.sort_by(|a, b| a.total_cmp(b));
     kfs.dedup();
-    (kfs.len() >= 2).then_some(kfs)
+    (!kfs.is_empty()).then_some(kfs)
 }
 
 #[derive(Deserialize, Clone, Copy, PartialEq, Eq, Debug, Default)]
@@ -372,18 +553,33 @@ pub struct Segment {
 impl Media {
     /// Resolves the mode actually used and its segment list. Copy mode silently degrades to
     /// transcoding when the codec can't be copied or no keyframe index is available.
-    pub async fn plan(&self, tools: &Tools, requested: VideoMode) -> (VideoMode, Vec<Segment>) {
+    pub async fn plan(self: &Arc<Self>, tools: &Arc<Tools>, requested: VideoMode) -> (VideoMode, Vec<Segment>) {
         let keyframes = match (&self.info.video, requested) {
-            (Some(video), VideoMode::Copy) if self.info.can_copy_video => self
-                .keyframes
-                .get_or_init(|| load_keyframes(tools, &self.path, self.fingerprint, video.index))
-                .await
-                .as_deref(),
+            (Some(video), VideoMode::Copy) if self.info.can_copy_video => {
+                self.resolve_keyframes(tools, video.index).await
+            }
             _ => None,
         };
         let mode = if keyframes.is_some() { VideoMode::Copy } else { VideoMode::Transcode };
         let end = self.start_time + self.info.duration;
         (mode, build_segments(self.start_time, end, keyframes))
+    }
+
+    /// Loads the keyframe index in a detached task. A packet scan of a large file can outlive
+    /// the request that triggered it (the player times out and retries); the scan must keep
+    /// going so the retry finds it finished or joins it, instead of starting over.
+    async fn resolve_keyframes(self: &Arc<Self>, tools: &Arc<Tools>, stream: usize) -> Option<&[f64]> {
+        if !self.keyframes.initialized() {
+            let (media, tools) = (Arc::clone(self), Arc::clone(tools));
+            let _ = tokio::spawn(async move {
+                media
+                    .keyframes
+                    .get_or_init(|| load_keyframes(&tools, &media.path, media.fingerprint, stream))
+                    .await;
+            })
+            .await;
+        }
+        self.keyframes.get().and_then(|kfs| kfs.as_deref())
     }
 }
 
@@ -472,7 +668,13 @@ fn aac_args(audio: &AudioStream) -> Vec<String> {
 
 /// Builds the ffmpeg arguments producing one MPEG-TS segment on stdout. Timestamps are kept
 /// absolute (`-copyts`) so independently generated segments line up in the player.
-pub fn segment_args(media: &Media, seg: Segment, audio: Option<&AudioStream>, mode: VideoMode) -> Vec<String> {
+pub fn segment_args(
+    media: &Media,
+    seg: Segment,
+    audio: Option<&AudioStream>,
+    mode: VideoMode,
+    encoder: VideoEncoder,
+) -> Vec<String> {
     let path = media.path.to_string_lossy().to_string();
     let video = media.info.video.as_ref().map(|v| v.index);
     // -ss/-to are relative to the container start; the trim filter uses absolute pts.
@@ -511,15 +713,9 @@ pub fn segment_args(media: &Media, seg: Segment, audio: Option<&AudioStream>, mo
         VideoMode::Transcode => {
             args.extend(["-ss".into(), secs(rel_start), "-to".into(), secs(rel_end)]);
             args.extend(["-i".into(), path.clone()]);
-            if let Some(v) = video {
-                maps.extend(["-map".into(), format!("0:{v}")]);
-                codecs.extend(
-                    [
-                        "-c:v", "libx264", "-preset", "veryfast", "-crf", "21", "-pix_fmt", "yuv420p",
-                        "-vf", "scale='min(1920,iw)':-2",
-                    ]
-                    .map(String::from),
-                );
+            if let Some(v) = &media.info.video {
+                maps.extend(["-map".into(), format!("0:{}", v.index)]);
+                codecs.extend(encoder.args(v.width, v.height));
             }
             if let Some(a) = audio {
                 maps.extend(["-map".into(), format!("0:{}", a.index)]);
@@ -558,9 +754,75 @@ pub fn thumbnail_args(path: &Path, time: f64, width: Option<u32>) -> Vec<String>
     args
 }
 
+/// Helpers for the ignored tests that run real ffmpeg/ffprobe binaries.
+#[cfg(test)]
+pub(crate) mod test_support {
+    use super::*;
+
+    pub fn real_tools() -> Tools {
+        let var = |name: &str| PathBuf::from(std::env::var(name).unwrap_or_else(|_| panic!("set {name}")));
+        Tools::new(var("VIDBASE_FFMPEG"), var("VIDBASE_FFPROBE"))
+    }
+
+    pub fn ffmpeg(tools: &Tools, args: &[&str]) -> Command {
+        let mut cmd = command(&tools.ffmpeg);
+        cmd.args(["-hide_banner", "-loglevel", "error", "-y"]).args(args);
+        cmd
+    }
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;
+
+    /// The MP4 index reader must never disagree with ffmpeg's demuxer: whenever it is
+    /// accepted for a file, it has to match the full packet scan exactly.
+    #[tokio::test]
+    #[ignore = "needs ffmpeg and ffprobe (VIDBASE_FFMPEG / VIDBASE_FFPROBE)"]
+    async fn mp4_index_matches_packet_scan() {
+        let tools = test_support::real_tools();
+        let dir = tempfile::tempdir().unwrap();
+        let source = dir.path().join("source.mp4");
+        let encode = ["-f", "lavfi", "-i", "testsrc=d=40:s=320x180:r=30000/1001", "-pix_fmt", "yuv420p", "-c:v", "libx264", "-g", "45"];
+        let status = test_support::ffmpeg(&tools, &encode).args(["-bf", "2"]).arg(&source).status().await.unwrap();
+        assert!(status.success());
+
+        // (name, arguments placed before the output) for remuxes/re-encodes of the source
+        // that exercise different sample-table and edit-list layouts.
+        let variants: [(&str, &[&str]); 7] = [
+            ("b-frames", &["-c", "copy"]),
+            ("faststart", &["-c", "copy", "-movflags", "+faststart"]),
+            ("negative-cts", &["-c", "copy", "-movflags", "+negative_cts_offsets"]),
+            ("delayed", &["-c", "copy", "-output_ts_offset", "2.5"]),
+            ("cut-mid-gop", &["-ss", "3.3", "-c", "copy"]),
+            ("no-b-frames", &["-c:v", "libx264", "-bf", "0", "-g", "30"]),
+            ("fragmented", &["-c", "copy", "-movflags", "+frag_keyframe+empty_moov"]),
+        ];
+        let mut accepted = Vec::new();
+        for (name, args) in variants {
+            let path = dir.path().join(format!("{name}.mp4"));
+            let mut cmd = test_support::ffmpeg(&tools, &[]);
+            // An input-side seek, so the stream copy starts on a keyframe after the cut.
+            let (input_args, output_args) = if args[0] == "-ss" { args.split_at(2) } else { (&[][..], args) };
+            let status = cmd.args(input_args).arg("-i").arg(&source).args(output_args).arg(&path).status().await.unwrap();
+            assert!(status.success(), "{name}");
+
+            let scanned = scan_keyframes(&tools, &path, 0).await.expect(name);
+            if let Some(indexed) = load_mp4_keyframes(&tools, &path, 0).await {
+                assert_eq!(indexed.len(), scanned.len(), "{name}: {indexed:?} vs {scanned:?}");
+                for (a, b) in indexed.iter().zip(&scanned) {
+                    assert!((a - b).abs() <= INDEX_CHECK_TOLERANCE, "{name}: {indexed:?} vs {scanned:?}");
+                }
+                accepted.push(name);
+            }
+        }
+        // The plain layouts must take the fast path; fragmented files never can.
+        for name in ["b-frames", "faststart", "no-b-frames"] {
+            assert!(accepted.contains(&name), "{name} fell back to scanning; accepted: {accepted:?}");
+        }
+        assert!(!accepted.contains(&"fragmented"));
+        println!("MP4 index accepted for: {accepted:?}");
+    }
 
     fn media(start_time: f64, duration: f64, keyframes: Option<Vec<f64>>) -> Media {
         Media {
@@ -619,8 +881,8 @@ mod tests {
 
     #[tokio::test]
     async fn copy_without_keyframes_falls_back_to_transcode() {
-        let tools = Tools { ffmpeg: "ffmpeg".into(), ffprobe: "ffprobe".into() };
-        let (mode, segs) = media(0.0, 60.0, None).plan(&tools, VideoMode::Copy).await;
+        let tools = Arc::new(Tools::new("ffmpeg".into(), "ffprobe".into()));
+        let (mode, segs) = Arc::new(media(0.0, 60.0, None)).plan(&tools, VideoMode::Copy).await;
         assert_eq!(mode, VideoMode::Transcode);
         assert_eq!(segs.len(), 10);
     }
@@ -638,7 +900,7 @@ mod tests {
     fn copy_args_use_relative_seek_and_absolute_trim() {
         let m = media(1.5, 60.0, Some(vec![1.5, 11.5]));
         let seg = Segment { start: 11.5, end: 21.5 };
-        let args = segment_args(&m, seg, Some(&audio("ac3", 6)), VideoMode::Copy).join(" ");
+        let args = segment_args(&m, seg, Some(&audio("ac3", 6)), VideoMode::Copy, VideoEncoder::X264).join(" ");
         assert!(args.contains("-ss 8.000000 -to 20.500000 -i /videos/a.mkv"), "{args}");
         assert!(args.contains("-ss 10.000000 -to 20.000000 -i /videos/a.mkv"), "{args}");
         assert!(args.contains("-map 0:0 -map 1:2"), "{args}");
@@ -647,9 +909,27 @@ mod tests {
     }
 
     #[test]
+    fn transcode_args_use_the_selected_encoder() {
+        let m = media(0.0, 60.0, None);
+        let seg = Segment { start: 6.0, end: 12.0 };
+        let software = segment_args(&m, seg, None, VideoMode::Transcode, VideoEncoder::X264).join(" ");
+        assert!(software.contains("-c:v libx264 -preset veryfast -crf 21 -pix_fmt yuv420p -vf scale='min(1920,iw)':-2"), "{software}");
+        let hardware = segment_args(&m, seg, None, VideoMode::Transcode, VideoEncoder::VideoToolbox).join(" ");
+        // 1280x720 source: 921600 px * 0.004.
+        assert!(hardware.contains("-c:v h264_videotoolbox -b:v 3686k -pix_fmt yuv420p"), "{hardware}");
+    }
+
+    #[test]
+    fn bitrate_accounts_for_downscaling() {
+        assert_eq!(target_bitrate_kbps(3840, 2160), 8294);
+        assert_eq!(target_bitrate_kbps(0, 0), 8000);
+        assert_eq!(target_bitrate_kbps(320, 240), 1500);
+    }
+
+    #[test]
     fn copy_args_copy_compatible_aac_from_single_input() {
         let m = media(0.0, 60.0, Some(vec![0.0, 10.0]));
-        let args = segment_args(&m, Segment { start: 0.0, end: 10.0 }, Some(&audio("aac", 2)), VideoMode::Copy);
+        let args = segment_args(&m, Segment { start: 0.0, end: 10.0 }, Some(&audio("aac", 2)), VideoMode::Copy, VideoEncoder::X264);
         assert_eq!(args.iter().filter(|a| *a == "-i").count(), 1);
         assert!(args.join(" ").contains("-c:a copy -bsf:a noise"));
     }

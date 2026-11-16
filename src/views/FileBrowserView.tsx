@@ -1,4 +1,4 @@
-import { useState, useEffect } from "react";
+import { useState, useEffect, useMemo } from "react";
 import { useTranslation } from 'react-i18next';
 import { motion, AnimatePresence } from "framer-motion";
 import { useFiles, FileSystemEntry, Directory, FileEntry } from "../contexts/FilesContext";
@@ -10,6 +10,8 @@ import FileCard from "../components/FileCard";
 import SearchBar from "../components/SearchBar";
 import { ArrowLeft, Plus } from "lucide-react";
 
+
+const normalizePath = (path: string) => path.replace(/[\\/]/g, '/').toLowerCase();
 
 interface FileBrowserViewProps {
   directories: Directory[];
@@ -35,27 +37,29 @@ export default function FileBrowserView({
   const [loading, setLoading] = useState(false);
   const [searchQuery, setSearchQuery] = useState("");
   const { listDirectory, files } = useFiles();
-  const { history } = useWatchHistory();
+  const { getEntry } = useWatchHistory();
 
   // Helper to get directory name from path
   const getDirName = (path: string) => path.split(/[\\/]/).pop() || path;
   
-  // Helper to get file count for a directory
-  const getFileCountForPath = (path: string): number => {
-    // Normalize path for consistent matching
-    const normalizedPath = path.replace(/[\\/]/g, '/').toLowerCase();
-    
-    return files.filter(file => {
-      // Check file type filter
-      if (fileTypeFilter && file.file_type !== fileTypeFilter) {
-        return false;
+  // Number of library files under each directory (at any depth), keyed by normalized path.
+  // Built in one pass over the library instead of re-scanning it for every folder card.
+  const fileCountByDirectory = useMemo(() => {
+    const counts = new Map<string, number>();
+    for (const file of files) {
+      if (fileTypeFilter && file.file_type !== fileTypeFilter) continue;
+      const path = normalizePath(file.path);
+      for (let slash = path.lastIndexOf('/'); slash > 0; slash = path.lastIndexOf('/', slash - 1)) {
+        const directory = path.slice(0, slash);
+        counts.set(directory, (counts.get(directory) ?? 0) + 1);
       }
-      
-      const fileDir = file.path.replace(/[\\/]/g, '/').toLowerCase();
-      return fileDir.startsWith(normalizedPath + '/') || fileDir === normalizedPath;
-    }).length; 
-  };
-  
+    }
+    return counts;
+  }, [files, fileTypeFilter]);
+
+  const getFileCountForPath = (path: string): number =>
+    fileCountByDirectory.get(normalizePath(path).replace(/\/+$/, '')) ?? 0;
+
   // Load entries when currentPath changes
   useEffect(() => {
     async function loadEntries() {
@@ -211,7 +215,7 @@ export default function FileBrowserView({
                     />
                   );
                 } else {
-                  const historyEntry = history.find(h => h.filePath === entry.path);
+                  const historyEntry = getEntry(entry.path);
                   const progress = historyEntry ? (historyEntry.currentTime / historyEntry.duration) * 100 : 0;
                   
                   return (

@@ -8,7 +8,7 @@ import { useSettings } from '../contexts/SettingsContext';
 import { cn } from "@/lib/utils";
 import VideoControls from '../components/player/VideoControls';
 import { type PlayerMenu, PLAYBACK_RATES } from '../components/player/PlayerSettingsMenu';
-import { languageName } from '../lib/mediaServer';
+import { languageName, type AudioStreamInfo, type SubtitleTrackInfo } from '../lib/mediaServer';
 import LoadingSpinner from '../components/LoadingSpinner';
 import EpisodesList from '../components/player/EpisodesList';
 import { useVideoShortcuts } from '../hooks/useVideoShortcuts';
@@ -17,6 +17,10 @@ import { useFolderSiblings } from '../hooks/useFolderSiblings';
 import { useMediaPlayback } from '../hooks/useMediaPlayback';
 import { useSubtitles } from '../hooks/useSubtitles';
 import { getCurrentWindow } from '@tauri-apps/api/window';
+
+// Shared empty lists, so "no tracks yet" doesn't look like a prop change on every render.
+const NO_AUDIO_TRACKS: AudioStreamInfo[] = [];
+const NO_SUBTITLE_TRACKS: SubtitleTrackInfo[] = [];
 
 interface VideoPlayerViewProps {
   file: FileEntry;
@@ -28,11 +32,10 @@ interface VideoPlayerViewProps {
 export default function VideoPlayerView({ file, onClose, onPlayFile, onNavigate }: VideoPlayerViewProps) {
   const { t, i18n } = useTranslation();
   const videoRef = useRef<HTMLVideoElement>(null);
-  const previewVideoRef = useRef<HTMLVideoElement>(null);
   const containerRef = useRef<HTMLDivElement>(null);
   const controlsTimeoutRef = useRef<number | null>(null);
   
-  const { history, updateProgress, toggleWatchedStatus, checkWatchedStatus } = useWatchHistory();
+  const { getEntry, updateProgress, toggleWatchedStatus, checkWatchedStatus } = useWatchHistory();
   const { settings } = useSettings();
   
   const { siblings, isLoadingSiblings } = useFolderSiblings(file.path, 'video');
@@ -45,7 +48,6 @@ export default function VideoPlayerView({ file, onClose, onPlayFile, onNavigate 
 
   // Player State
   const [isPlaying, setIsPlaying] = useState(false);
-  const [currentTime, setCurrentTime] = useState(0);
   const [duration, setDuration] = useState(0);
   const [volume, setVolume] = useState(1);
   const [isMuted, setIsMuted] = useState(false);
@@ -56,14 +58,10 @@ export default function VideoPlayerView({ file, onClose, onPlayFile, onNavigate 
   const [showControls, setShowControls] = useState(true);
   const [showSidebar, setShowSidebar] = useState(true);
 
-  // Preview Tooltip State
-  const [previewTime, setPreviewTime] = useState<number | null>(null);
-  const [previewLeft, setPreviewLeft] = useState<number>(0);
-
   const [isBuffering, setIsBuffering] = useState(false);
 
   const initialTime = useMemo(
-    () => history.find(h => h.filePath === file.path)?.currentTime ?? 0,
+    () => getEntry(file.path)?.currentTime ?? 0,
     // Only the position at open time matters; later history updates come from this player.
     // eslint-disable-next-line react-hooks/exhaustive-deps
     [file.path]
@@ -82,9 +80,17 @@ export default function VideoPlayerView({ file, onClose, onPlayFile, onNavigate 
 
     let progressInterval: number | undefined;
 
+    // Kept in a ref only: the seek bar tracks the position itself, so playback doesn't
+    // re-render this whole view several times per second.
     const handleTimeUpdate = () => {
       lastKnownTimeRef.current = video.currentTime;
-      setCurrentTime(video.currentTime);
+    };
+
+    // Committed right away at natural stopping points; the periodic reports in between
+    // are batched by the history context.
+    const saveProgressNow = () => {
+      const t = lastKnownTimeRef.current;
+      if (t > 0) updateProgress(file.path, t, currentDurationRef.current, true);
     };
 
     const handleDurationChange = () => {
@@ -106,7 +112,10 @@ export default function VideoPlayerView({ file, onClose, onPlayFile, onNavigate 
       }
     };
 
-    const handlePlayPause = () => setIsPlaying(!video.paused);
+    const handlePlayPause = () => {
+      setIsPlaying(!video.paused);
+      if (video.paused && !video.ended) saveProgressNow();
+    };
     const handleVolumeChange = () => {
         setVolume(video.volume);
         setIsMuted(video.muted);
@@ -118,7 +127,7 @@ export default function VideoPlayerView({ file, onClose, onPlayFile, onNavigate 
     const handleEnded = () => {
       setIsPlaying(false);
       const d = currentDurationRef.current;
-      updateProgress(file.path, d, d);
+      updateProgress(file.path, d, d, true);
     };
 
     video.addEventListener('timeupdate', handleTimeUpdate);
@@ -147,10 +156,7 @@ export default function VideoPlayerView({ file, onClose, onPlayFile, onNavigate 
       video.removeEventListener('playing', handleResume);
       video.removeEventListener('seeked', handleResume);
 
-      const t = lastKnownTimeRef.current;
-      if (t > 0) {
-        updateProgress(file.path, t, currentDurationRef.current);
-      }
+      saveProgressNow();
 
       // Explicitly stop playback
       try {
@@ -188,14 +194,6 @@ export default function VideoPlayerView({ file, onClose, onPlayFile, onNavigate 
         }
         else videoRef.current.pause();
     }
-  }, []);
-
-  const handleSeek = useCallback((e: React.ChangeEvent<HTMLInputElement>) => {
-      const time = parseFloat(e.target.value);
-      if (videoRef.current) {
-          videoRef.current.currentTime = time;
-      }
-      setCurrentTime(time);
   }, []);
 
   const skip = useCallback((seconds: number) => {
@@ -357,26 +355,15 @@ export default function VideoPlayerView({ file, onClose, onPlayFile, onNavigate 
           .catch((e) => console.error('Failed to copy path:', e));
   }, [showOsd, t]);
 
-  const handleProgressMouseMove = useCallback((e: React.MouseEvent<HTMLDivElement>) => {
-      const rect = e.currentTarget.getBoundingClientRect();
-      const x = e.clientX - rect.left;
-      const percentage = Math.max(0, Math.min(1, x / rect.width));
-      const time = percentage * (duration || 0);
-      
-      setPreviewTime(time);
-      
-      const tooltipHalfWidth = 92; 
-      const clampedX = Math.max(tooltipHalfWidth, Math.min(x, rect.width - tooltipHalfWidth));
-      setPreviewLeft(clampedX);
-
-      if (previewVideoRef.current) {
-          previewVideoRef.current.currentTime = time;
-      }
-  }, [duration]);
-
-  const handleProgressMouseLeave = useCallback(() => {
-      setPreviewTime(null);
-  }, []);
+  // Stable identities, so the memoized controls only re-render when something they show changes.
+  const playPreviousEpisode = useMemo(
+    () => (previousEpisode ? () => onPlayFile(previousEpisode) : undefined),
+    [previousEpisode, onPlayFile]
+  );
+  const playNextEpisode = useMemo(
+    () => (nextEpisode ? () => onPlayFile(nextEpisode) : undefined),
+    [nextEpisode, onPlayFile]
+  );
 
   const handlePlaybackRateChange = useCallback((rate: number) => {
       if (videoRef.current) {
@@ -502,17 +489,11 @@ export default function VideoPlayerView({ file, onClose, onPlayFile, onNavigate 
                 show={showControls}
                 isPlaying={isPlaying}
                 togglePlay={togglePlay}
-                currentTime={currentTime}
+                videoRef={videoRef}
                 duration={duration}
-                handleSeek={handleSeek}
-                previewTime={previewTime}
-                previewLeft={previewLeft}
-                handleProgressMouseMove={handleProgressMouseMove}
-                handleProgressMouseLeave={handleProgressMouseLeave}
-                previewVideoRef={previewVideoRef}
                 filePath={file.path}
-                onPreviousEpisode={previousEpisode ? () => onPlayFile(previousEpisode) : undefined}
-                onNextEpisode={nextEpisode ? () => onPlayFile(nextEpisode) : undefined}
+                onPreviousEpisode={playPreviousEpisode}
+                onNextEpisode={playNextEpisode}
                 volume={volume}
                 isMuted={isMuted}
                 toggleMute={toggleMute}
@@ -524,15 +505,14 @@ export default function VideoPlayerView({ file, onClose, onPlayFile, onNavigate 
                 activeMenu={activeMenu}
                 setActiveMenu={setActiveMenu}
                 playbackRate={playbackRate}
-                setPlaybackRate={setPlaybackRate}
                 videoHeight={videoRef.current?.videoHeight}
                 onPlaybackRateChange={handlePlaybackRateChange}
                 useServerPreview={playback.mode === 'hls'}
                 isTranscoding={playback.isTranscoding}
-                audioTracks={playback.info?.audio ?? []}
+                audioTracks={playback.info?.audio ?? NO_AUDIO_TRACKS}
                 audioIndex={playback.audioIndex}
                 onAudioChange={playback.setAudioIndex}
-                subtitleTracks={playback.info?.subtitles ?? []}
+                subtitleTracks={playback.info?.subtitles ?? NO_SUBTITLE_TRACKS}
                 subtitleId={subtitles.selectedId}
                 onSubtitleChange={subtitles.setSelectedId}
             />

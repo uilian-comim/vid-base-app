@@ -1,6 +1,6 @@
-import { createContext, useContext, useState, useEffect, ReactNode, useCallback, useMemo } from 'react';
+import { createContext, useContext, useState, useEffect, ReactNode, useCallback, useMemo, useRef } from 'react';
+import { invoke } from '@tauri-apps/api/core';
 import { readDir } from '@tauri-apps/plugin-fs';
-import { join } from '@tauri-apps/api/path';
 import { useSettings } from './SettingsContext';
 
 export interface FileEntry {
@@ -31,79 +31,50 @@ const DOCUMENT_EXTENSIONS = ['.pdf', '.html'];
 
 const DIRECTORY_COLORS: Array<"blue" | "purple" | "green" | "orange"> = ["blue", "purple", "green", "orange"];
 
+/** Appends a file name to a directory path using that path's own separator (no IPC round trip). */
+function joinPath(dir: string, name: string): string {
+  const separator = dir.includes('/') ? '/' : '\\';
+  return dir.endsWith('/') || dir.endsWith('\\') ? dir + name : dir + separator + name;
+}
+
 export function FilesProvider({ children }: { children: ReactNode }) {
   const [files, setFiles] = useState<FileEntry[]>([]);
   const [directories, setDirectories] = useState<Directory[]>([]);
   const [isLoading, setIsLoading] = useState(false);
   const { settings } = useSettings();
 
-  const scanDirectoryRecursively = async (dirPath: string): Promise<FileEntry[]> => {
-    let foundFiles: FileEntry[] = [];
-    
-    try {
-      const entries = await readDir(dirPath);
-      
-      for (const entry of entries) {
-        const fullPath = await join(dirPath, entry.name);
-        
-        if (entry.isDirectory) {
-          const subFiles = await scanDirectoryRecursively(fullPath);
-          foundFiles = [...foundFiles, ...subFiles];
-        } else if (entry.isFile) {
-          const lowerName = entry.name.toLowerCase();
-          const isVideo = VIDEO_EXTENSIONS.some(ext => lowerName.endsWith(ext));
-          const isDocument = DOCUMENT_EXTENSIONS.some(ext => lowerName.endsWith(ext));
-          
-          if (isVideo || isDocument) {
-            foundFiles.push({
-              name: entry.name,
-              path: fullPath,
-              file_type: isVideo ? 'video' : 'document'
-            });
-          }
-        }
-      }
-    } catch (error) {
-      console.error(`Error scanning directory ${dirPath}:`, error);
-    }
-    
-    return foundFiles;
-  };
+  // Bumped on every scan so a slow, superseded scan can't overwrite a newer result.
+  const scanIdRef = useRef(0);
 
   const refreshFiles = useCallback(async () => {
-    if (settings.directories.length === 0) {
+    const scanId = ++scanIdRef.current;
+    const roots = settings.directories;
+
+    if (roots.length === 0) {
       setFiles([]);
       setDirectories([]);
+      setIsLoading(false);
       return;
     }
 
     setIsLoading(true);
-    let allFiles: FileEntry[] = [];
-    let newDirectories: Directory[] = [];
-    
-    // Process each configured directory
-    for (const [index, dirPath] of settings.directories.entries()) {
-      try {
-        const dirFiles = await scanDirectoryRecursively(dirPath);
-        allFiles = [...allFiles, ...dirFiles];
-        
-        // Extract directory name from path
-        // Using string manipulation as a fallback if basename isn't readily available or async
-        const dirName = dirPath.split(/[\\/]/).pop() || dirPath;
-        
-        newDirectories.push({
-          name: dirName,
-          path: dirPath,
-          fileCount: dirFiles.length,
-          color: DIRECTORY_COLORS[index % DIRECTORY_COLORS.length]
-        });
-      } catch (error) {
-        console.error(`Failed to process directory ${dirPath}:`, error);
-      }
-    }
+    try {
+      // The whole library is walked natively in one call (see src-tauri/src/files.rs),
+      // returning one file list per root.
+      const filesByRoot = await invoke<FileEntry[][]>('list_media_files', { paths: roots });
+      if (scanId !== scanIdRef.current) return;
 
-    setFiles(allFiles);
-    setDirectories(newDirectories);
+      setFiles(filesByRoot.flat());
+      setDirectories(roots.map((dirPath, index) => ({
+        name: dirPath.split(/[\\/]/).pop() || dirPath,
+        path: dirPath,
+        fileCount: filesByRoot[index]?.length ?? 0,
+        color: DIRECTORY_COLORS[index % DIRECTORY_COLORS.length],
+      })));
+    } catch (error) {
+      if (scanId !== scanIdRef.current) return;
+      console.error('Failed to scan library:', error);
+    }
     setIsLoading(false);
   }, [settings.directories]);
 
@@ -118,8 +89,8 @@ export function FilesProvider({ children }: { children: ReactNode }) {
       const processedEntries: FileSystemEntry[] = [];
 
       for (const entry of entries) {
-        const fullPath = await join(path, entry.name);
-        
+        const fullPath = joinPath(path, entry.name);
+
         if (entry.isDirectory) {
           processedEntries.push({
             name: entry.name,

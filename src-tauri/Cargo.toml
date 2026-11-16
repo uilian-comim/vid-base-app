@@ -1,6 +1,6 @@
 [package]
 name = "vidbase"
-version = "0.2.10"
+version = "0.3.0"
 description = "A Tauri App"
 authors = ["you"]
 edition = "2021"
@@ -27,11 +27,12 @@ walkdir = "2.5.0"
 tauri-plugin-fs = "2.5.2"
 tauri-plugin-store = "2.4.5"
 axum = "0.8.9"
-tokio = { version = "1.53.1", features = ["process", "io-util", "sync"] }
+tokio = { version = "1.53.1", features = ["process", "io-util", "sync", "fs", "time"] }
 tower-http = { version = "0.6.11", features = ["cors", "fs"] }
 tauri-plugin-shell = "2.3.6"
 async-stream = "0.3.6"
 discord-presence = "3.2.0"
+getrandom = "0.3.4"
 
 [target.'cfg(windows)'.dependencies]
 sysinfo = "0.30.13"

@@ -3,6 +3,7 @@ use tauri::Manager;
 mod files;
 mod media;
 mod mkv_cues;
+mod mp4_index;
 mod streamer;
 mod volume_mixer; // <-- NEW
 
@@ -12,9 +13,24 @@ fn greet(name: &str) -> String {
     format!("Hello, {}! You've been greeted from Rust!", name)
 }
 
+/// Where the webview finds the local media server, and the token it must send with every
+/// request. `None` when the server could not be started.
+struct MediaServer(Option<MediaServerInfo>);
+
+#[derive(Clone, serde::Serialize)]
+struct MediaServerInfo {
+    port: u16,
+    token: String,
+}
+
+#[tauri::command]
+fn media_server_info(server: tauri::State<'_, MediaServer>) -> Result<MediaServerInfo, String> {
+    server.0.clone().ok_or_else(|| "The local media server is not running".to_string())
+}
+
 #[tauri::command]
 async fn clear_video_cache() -> Result<(), String> {
-    let temp_dir = std::env::temp_dir().join("vidbase_streams");
+    let temp_dir = media::cache_dir();
     if temp_dir.exists() {
         std::fs::remove_dir_all(&temp_dir).map_err(|e| format!("Failed to clear cache: {}", e))?;
     }
@@ -48,10 +64,19 @@ fn window_close(window: tauri::Window) {
 pub fn run() {
     volume_mixer::init();
 
-    // Start video streamer on a background thread natively
-    tauri::async_runtime::spawn(async move {
-        streamer::start_server().await;
-    });
+    // Bind the media server before the webview exists, so its address is known by the
+    // time the frontend asks for it.
+    let media_server = match streamer::bind() {
+        Ok(endpoint) => {
+            let info = MediaServerInfo { port: endpoint.port, token: endpoint.token.clone() };
+            tauri::async_runtime::spawn(streamer::serve(endpoint));
+            Some(info)
+        }
+        Err(e) => {
+            eprintln!("Failed to bind the media server: {e}");
+            None
+        }
+    };
 
     let builder = tauri::Builder::default();
 
@@ -65,6 +90,7 @@ pub fn run() {
         .plugin(tauri_plugin_fs::init())
         .plugin(tauri_plugin_dialog::init())
         .plugin(tauri_plugin_shell::init())
+        .manage(MediaServer(media_server))
         .manage(discord_rpc::DiscordState {
             // <-- NEW
             client: std::sync::Mutex::new(None),
@@ -72,6 +98,7 @@ pub fn run() {
         .invoke_handler(tauri::generate_handler![
             greet,
             files::list_media_files,
+            media_server_info,
             clear_video_cache,
             window_minimize,
             window_toggle_maximize,

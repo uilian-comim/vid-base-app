@@ -1,4 +1,4 @@
-import { useState, lazy, Suspense, useCallback, useEffect } from "react";
+import { useState, lazy, Suspense, useCallback, useEffect, useMemo } from "react";
 
 import { useTranslation } from 'react-i18next';
 import { motion, AnimatePresence } from "framer-motion";
@@ -190,17 +190,22 @@ function AppContent() {
     }
   }, [closePlayer]);
 
+  // Derived lists keep their identity between renders, so memoized children and hooks
+  // downstream (e.g. the folder grouping in AllFilesView) aren't recomputed needlessly.
   // Get recent files (last 6)
-  const recentFiles = files.slice(0, 6);
+  const recentFiles = useMemo(() => files.slice(0, 6), [files]);
 
   // Count files by type
-  const videoCount = files.filter(f => f.file_type === "video").length;
-  const documentCount = files.filter(f => f.file_type === "document").length;
+  const { videoCount, documentCount } = useMemo(() => {
+    const videoCount = files.reduce((count, f) => count + (f.file_type === "video" ? 1 : 0), 0);
+    return { videoCount, documentCount: files.length - videoCount };
+  }, [files]);
 
   // Filter files for AllFilesView
-  const displayedFiles = fileTypeFilter 
-    ? files.filter(f => f.file_type === fileTypeFilter)
-    : files;
+  const displayedFiles = useMemo(
+    () => (fileTypeFilter ? files.filter(f => f.file_type === fileTypeFilter) : files),
+    [files, fileTypeFilter]
+  );
 
   // Determine if we are playing a video
   const isPlayingVideo = playingFile && playingFile.file_type === 'video';

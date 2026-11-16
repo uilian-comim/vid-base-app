@@ -1,24 +1,19 @@
+import { memo } from 'react';
 import { motion, AnimatePresence } from 'framer-motion';
 import { useTranslation } from 'react-i18next';
 import { Play, Pause, SkipBack, SkipForward, VolumeX, Volume2, Settings, Minimize, Maximize } from 'lucide-react';
 import { cn } from "@/lib/utils";
 import PlayerSettingsMenu, { type PlayerMenu } from './PlayerSettingsMenu';
-import { formatTime } from '../../utils/utils';
-import { convertFileSrc } from '@tauri-apps/api/core';
-import { type AudioStreamInfo, type SubtitleTrackInfo, thumbnailUrl } from '../../lib/mediaServer';
+import { SeekBar, PlaybackTime } from './SeekBar';
+import { type AudioStreamInfo, type SubtitleTrackInfo } from '../../lib/mediaServer';
 
 interface VideoControlsProps {
   show: boolean;
   isPlaying: boolean;
   togglePlay: () => void;
-  currentTime: number;
+  /** The seek bar and time label read the position from the element themselves. */
+  videoRef: React.RefObject<HTMLVideoElement | null>;
   duration: number;
-  handleSeek: (e: React.ChangeEvent<HTMLInputElement>) => void;
-  previewTime: number | null;
-  previewLeft: number;
-  handleProgressMouseMove: (e: React.MouseEvent<HTMLDivElement>) => void;
-  handleProgressMouseLeave: () => void;
-  previewVideoRef: React.RefObject<HTMLVideoElement | null>;
   filePath: string;
   /** Undefined when there is no previous/next episode in the folder. */
   onPreviousEpisode?: () => void;
@@ -34,7 +29,6 @@ interface VideoControlsProps {
   activeMenu: PlayerMenu;
   setActiveMenu: (menu: PlayerMenu) => void;
   playbackRate: number;
-  setPlaybackRate: (rate: number) => void;
   videoHeight?: number;
   onPlaybackRateChange: (rate: number) => void;
   /** Seek previews come from ffmpeg when the webview can't decode the file itself. */
@@ -48,18 +42,12 @@ interface VideoControlsProps {
   onSubtitleChange: (id: string | null) => void;
 }
 
-export default function VideoControls({
+export default memo(function VideoControls({
   show,
   isPlaying,
   togglePlay,
-  currentTime,
+  videoRef,
   duration,
-  handleSeek,
-  previewTime,
-  previewLeft,
-  handleProgressMouseMove,
-  handleProgressMouseLeave,
-  previewVideoRef,
   filePath,
   onPreviousEpisode,
   onNextEpisode,
@@ -100,57 +88,7 @@ export default function VideoControls({
           onClick={(e) => e.stopPropagation()}
           onDoubleClick={(e) => e.stopPropagation()}
         >
-          {/* Progress Bar */}
-          <div 
-            className="relative w-full h-1 bg-white/25 rounded-full cursor-pointer group mb-3 hover:h-1.5 transition-all"
-            onMouseMove={handleProgressMouseMove}
-            onMouseLeave={handleProgressMouseLeave}
-
-          >
-            {previewTime !== null && (
-              <div 
-                className="absolute bottom-8 -translate-x-1/2 bg-zinc-900/90 backdrop-blur-xl border border-white/10 rounded-xl p-1 flex flex-col items-center pointer-events-none z-20 shadow-2xl overflow-hidden min-w-[160px]"
-                style={{ left: previewLeft }}
-              >
-                {!useServerPreview ? (
-                  <div className="w-[180px] aspect-video bg-black flex items-center justify-center overflow-hidden rounded-lg relative">
-                    <video
-                      ref={previewVideoRef}
-                      src={convertFileSrc(filePath)}
-                      className="w-full h-full object-cover"
-                      muted
-                      preload="auto"
-                      disablePictureInPicture
-                    />
-                  </div>
-                ) : (
-                  <div className="w-[180px] aspect-video bg-black flex items-center justify-center overflow-hidden rounded-lg relative">
-                    <img 
-                      src={thumbnailUrl(filePath, previewTime, 360)}
-                      className="w-full h-full object-cover"
-                      alt="Preview"
-                    />
-                  </div>
-                )}
-                <span className="w-full text-center py-2 text-sm font-semibold text-white tabular-nums">{formatTime(previewTime)}</span>
-              </div>
-            )}
-            <div 
-              className="brand-bg h-full rounded-full relative"
-              style={{ width: `${(currentTime / (duration || 1)) * 100}%` }}
-            >
-              <div className="absolute right-0 top-1/2 -translate-y-1/2 w-3.5 h-3.5 bg-white rounded-full opacity-0 group-hover:opacity-100 transition-opacity scale-0 group-hover:scale-125 shadow-lg ring-2 ring-white/20" />
-            </div>
-            
-            <input 
-              type="range" 
-              min="0" 
-              max={duration || 100} 
-              value={currentTime} 
-              onChange={handleSeek}
-              className="absolute inset-0 w-full h-full opacity-0 cursor-pointer z-20"
-            />
-          </div>
+          <SeekBar videoRef={videoRef} duration={duration} filePath={filePath} useServerPreview={useServerPreview} />
 
           <div className="flex justify-between items-center">
             <div className="flex items-center gap-4">
@@ -198,7 +136,7 @@ export default function VideoControls({
               </div>
 
               <div className="text-[13px] text-white/70 tabular-nums tracking-wide ml-2">
-                {formatTime(currentTime)} / {formatTime(duration)}
+                <PlaybackTime videoRef={videoRef} duration={duration} />
               </div>
             </div>
 
@@ -237,4 +175,4 @@ export default function VideoControls({
       )}
     </AnimatePresence>
   );
-}
+});

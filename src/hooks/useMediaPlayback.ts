@@ -126,6 +126,17 @@ export function useMediaPlayback({ videoRef, filePath, startTime }: UseMediaPlay
       startPosition: time > 0 ? time : -1,
       maxBufferLength: 30,
       enableCEA708Captions: false,
+      // The first playlist request may wait for a keyframe scan of the whole file (non-MKV
+      // containers without a usable index). The server keeps scanning across retries, so
+      // be patient instead of failing after the default 20 s.
+      manifestLoadPolicy: {
+        default: {
+          maxTimeToFirstByteMs: Infinity,
+          maxLoadTimeMs: 5 * 60_000,
+          timeoutRetry: { maxNumRetry: 3, retryDelayMs: 0, maxRetryDelayMs: 0 },
+          errorRetry: { maxNumRetry: 1, retryDelayMs: 1000, maxRetryDelayMs: 8000 },
+        },
+      },
       // Segments are generated on demand; transcoding a segment can take a few seconds.
       fragLoadPolicy: {
         default: {

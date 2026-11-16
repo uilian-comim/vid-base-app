@@ -148,12 +148,8 @@ export default function AllFilesView({
       <section className="flex-1 overflow-y-auto p-6 -mx-6">
         {sortedDirectories.length > 0 ? (
           settings.viewMode === 'grid' ? (
-            <motion.div 
-              className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 lg:grid-cols-4 xl:grid-cols-4 gap-6"
-              layout
-            >
+            <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 lg:grid-cols-4 xl:grid-cols-4 gap-6">
               <motion.div 
-                layout
                 className="border-2 border-dashed border-muted-foreground/20 rounded-xl flex flex-col items-center justify-center p-6 gap-4 cursor-pointer hover:border-primary/50 hover:bg-muted/50 transition-all group min-h-[220px] h-full" 
                 onClick={onAddDirectory}
                 whileHover={{ scale: 1.02, borderColor: 'hsl(var(--primary))' }}
@@ -180,11 +176,10 @@ export default function AllFilesView({
                   index={index}
                 />
               ))}
-            </motion.div>
+            </div>
           ) : (
-            <motion.div className="flex flex-col gap-2" layout>
+            <div className="flex flex-col gap-2">
                <motion.div 
-                layout
                 className="flex items-center gap-4 p-4 rounded-lg border-2 border-dashed border-muted-foreground/20 cursor-pointer hover:border-primary/50 hover:bg-muted/50 transition-all group"
                 onClick={onAddDirectory}
                 whileHover={{ scale: 1.005, borderColor: 'hsl(var(--primary))' }}
@@ -199,10 +194,10 @@ export default function AllFilesView({
               {sortedDirectories.map(([path, info], index) => (
                 <motion.div
                   key={path}
-                  layout
                   initial={{ opacity: 0, x: -10 }}
                   animate={{ opacity: 1, x: 0 }}
-                  transition={{ delay: index * 0.03 }}
+                  // Only the first rows are staggered; otherwise row 300 would wait 9 s to appear.
+                  transition={{ delay: Math.min(index, 12) * 0.03 }}
                   className="group flex items-center gap-4 p-4 rounded-lg bg-card border border-border/50 hover:border-primary/50 hover:shadow-lg transition-all cursor-pointer hover:bg-accent/10 relative"
                   onClick={() => onDirectoryClick(path)}
                   whileHover={{ scale: 1.02, zIndex: 10, x: 4 }}
@@ -221,7 +216,7 @@ export default function AllFilesView({
                   <ChevronRight size={18} className="text-muted-foreground opacity-0 group-hover:opacity-100 transition-all transform group-hover:translate-x-1" />
                 </motion.div>
               ))}
-            </motion.div>
+            </div>
           )
         ) : (
           <motion.div 
